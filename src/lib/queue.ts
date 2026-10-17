@@ -1,13 +1,9 @@
 import type { Dataset } from '@/types/dataset'
-import { buildCard, getQuizMode, type QuizModeId, type StudyCard } from './quizModes'
+import { buildCard, modesForItem, type QuizModeId, type StudyCard } from './quizModes'
 import { pickRandom, shuffle, type RandomFn } from './shuffle'
 import { isDue, type CardProgress } from './srs'
 
 type ProgressLookup = (key: string) => CardProgress | undefined
-
-function modesFor(dataset: Dataset, modeIds: readonly QuizModeId[]): QuizModeId[] {
-  return modeIds.filter((id) => getQuizMode(id).category === dataset.category)
-}
 
 const keyOf = (dataset: Dataset, itemId: string, modeId: QuizModeId) =>
   `${dataset.id}:${itemId}:${modeId}`
@@ -27,6 +23,7 @@ export interface QueueOptions {
  * 1. 所有到期的卡（每個項目的每個測驗方向各自計算）
  * 2. 新卡：依資料集順序取還沒學過的項目，每個項目只挑一個尚未學過的方向，最多 newLimit 張
  * 3. 兩者混合洗牌
+ * 只考慮適用於該項目的方向，例如沒有例句就不出例句題。
  */
 export function buildStudyQueue(options: QueueOptions): StudyCard[] {
   const { datasets, modeIds, progress, newLimit, now, random = Math.random } = options
@@ -34,21 +31,20 @@ export function buildStudyQueue(options: QueueOptions): StudyCard[] {
   const fresh: StudyCard[] = []
 
   for (const dataset of datasets) {
-    const modes = modesFor(dataset, modeIds)
     for (const item of dataset.data) {
       let hasDueCard = false
       const unseen: QuizModeId[] = []
-      for (const modeId of modes) {
+      for (const modeId of modesForItem(dataset, item, modeIds)) {
         const p = progress(keyOf(dataset, item.id, modeId))
         if (!p) unseen.push(modeId)
         else if (isDue(p, now)) {
-          due.push(buildCard(dataset, item, modeId))
+          due.push(buildCard(dataset, item, modeId, random))
           hasDueCard = true
         }
       }
       // 同一個項目這次已經有複習卡時，就不再加它的新方向，避免連續出現
       if (!hasDueCard && unseen.length && fresh.length < newLimit) {
-        fresh.push(buildCard(dataset, item, pickRandom(unseen, random)))
+        fresh.push(buildCard(dataset, item, pickRandom(unseen, random), random))
       }
     }
   }
@@ -71,9 +67,11 @@ export function countDataset(
   progress: ProgressLookup,
   now: number,
 ): DatasetCounts {
-  const modes = modesFor(dataset, modeIds)
   const counts: DatasetCounts = { due: 0, unseen: 0, seen: 0 }
   for (const item of dataset.data) {
+    const modes = modesForItem(dataset, item, modeIds)
+    // 沒有任何適用方向的項目不列入計算
+    if (modes.length === 0) continue
     let seen = false
     for (const modeId of modes) {
       const p = progress(keyOf(dataset, item.id, modeId))

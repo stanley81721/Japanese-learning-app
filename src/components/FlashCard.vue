@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import CardTextView from '@/components/CardTextView.vue'
 import MarkdownContent from '@/components/MarkdownContent.vue'
-import type { CardText, StudyCard } from '@/lib/quizModes'
+import type { StudyCard } from '@/lib/quizModes'
 
 const props = withDefaults(
   defineProps<{
@@ -16,8 +17,6 @@ const props = withDefaults(
 
 const emit = defineEmits<{ flip: [] }>()
 
-const langOf = (t: CardText) => (t.lang === 'ja' ? 'ja' : 'zh-Hant')
-
 // 點擊卡片翻面；解釋中的連結照常開啟。鍵盤操作由 StudyView 的按鈕與快捷鍵負責。
 function onClick(event: MouseEvent) {
   if (!props.clickable || (event.target as HTMLElement).closest('a')) return
@@ -29,20 +28,16 @@ function onClick(event: MouseEvent) {
   <div class="flashcard" :class="{ flipped, clickable }" @click="onClick">
     <div class="card-inner">
       <div class="face front" :aria-hidden="flipped" :inert="flipped || undefined">
-        <div class="main" :class="card.front.lang" :lang="langOf(card.front)">
-          {{ card.front.text }}
-        </div>
+        <CardTextView class="main" :class="card.front.lang" :value="card.front" />
+        <CardTextView v-if="card.front.note" class="note" :value="card.front.note" />
         <div class="hint">{{ hint }}</div>
       </div>
 
       <div class="face back" :aria-hidden="!flipped" :inert="!flipped || undefined">
-        <div class="question" :lang="langOf(card.front)">{{ card.front.text }}</div>
-        <div class="main" :class="card.back.lang" :lang="langOf(card.back)">
-          {{ card.back.text }}
-        </div>
-        <div v-if="card.back.sub" class="sub" :lang="langOf(card.back.sub)">
-          {{ card.back.sub.text }}
-        </div>
+        <CardTextView class="question" :value="card.front" />
+        <CardTextView class="main" :class="card.back.lang" :value="card.back" />
+        <CardTextView v-if="card.back.sub" class="sub" :value="card.back.sub" />
+        <CardTextView v-if="card.back.note" class="note" :value="card.back.note" />
         <MarkdownContent
           v-if="card.back.explanation"
           class="explanation"
@@ -121,9 +116,30 @@ function onClick(event: MouseEvent) {
   font-size: clamp(1.5rem, 6vw, 2.5rem);
 }
 
+/* 例句比單字長，用較小的字 */
+.main.sentence {
+  font-size: clamp(1.25rem, 4.5vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.7;
+}
+
 .sub {
   color: var(--color-text-muted);
   font-size: 1.25rem;
+}
+
+.sub.sentence {
+  color: var(--color-text);
+  font-size: 1.0625rem;
+}
+
+.note {
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+.back .note:last-child {
+  margin-bottom: auto;
 }
 
 .question {

@@ -2,7 +2,11 @@
 import { computed } from 'vue'
 import { parseMarkedSentence } from '@/lib/grammarMarkup'
 
-const props = defineProps<{ sentence: string }>()
+const props = defineProps<{
+  sentence: string
+  /** 把【】標記的部分顯示成空格（挖空題） */
+  cloze?: boolean
+}>()
 
 const segments = computed(() => parseMarkedSentence(props.sentence))
 </script>
@@ -10,7 +14,8 @@ const segments = computed(() => parseMarkedSentence(props.sentence))
 <template>
   <span lang="ja">
     <template v-for="(segment, i) in segments" :key="i">
-      <mark v-if="segment.marked" class="grammar-mark">{{ segment.text }}</mark>
+      <span v-if="segment.marked && cloze" class="cloze-blank" aria-label="空格">　</span>
+      <mark v-else-if="segment.marked" class="grammar-mark">{{ segment.text }}</mark>
       <template v-else>{{ segment.text }}</template>
     </template>
   </span>

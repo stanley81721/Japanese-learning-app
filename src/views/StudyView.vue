@@ -6,9 +6,8 @@ import { storeToRefs } from 'pinia'
 import AnswerMethodPicker from '@/components/AnswerMethodPicker.vue'
 import ModePicker from '@/components/ModePicker.vue'
 import SessionPanel from '@/components/SessionPanel.vue'
-import { buildPracticeDeck } from '@/lib/deck'
+import { buildPracticeDeck, countPracticeItems } from '@/lib/deck'
 import { buildStudyQueue, countDataset } from '@/lib/queue'
-import { getQuizMode } from '@/lib/quizModes'
 import { useDatasetsStore } from '@/stores/datasets'
 import { useProgressStore } from '@/stores/progress'
 import { useSettingsStore } from '@/stores/settings'
@@ -54,9 +53,7 @@ const queuePreviewSize = computed(() => buildQueue().length)
 const newInQueue = computed(() => queuePreviewSize.value - dueCount.value)
 
 const practiceDeckSize = computed(() =>
-  selectedDatasets.value
-    .filter((d) => enabledModes.value.some((id) => getQuizMode(id).category === d.category))
-    .reduce((sum, d) => sum + d.data.length, 0),
+  countPracticeItems(selectedDatasets.value, enabledModes.value),
 )
 
 function startStudy() {

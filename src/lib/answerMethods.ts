@@ -1,5 +1,5 @@
 import type { Dataset } from '@/types/dataset'
-import { buildCard, getQuizMode, type StudyCard } from './quizModes'
+import { buildCard, getQuizMode, isModeAvailable, type StudyCard } from './quizModes'
 import { pickRandom, shuffle, type RandomFn } from './shuffle'
 
 export type AnswerMethod = 'flip' | 'choice' | 'input'
@@ -38,7 +38,8 @@ export function buildChoices(
     if (dataset.category !== category) continue
     for (const item of dataset.data) {
       if (dataset.id === card.datasetId && item.id === card.itemId) continue
-      const text = buildCard(dataset, item, card.modeId).back.text
+      if (!isModeAvailable(card.modeId, item)) continue
+      const text = buildCard(dataset, item, card.modeId, random).back.text
       if (text !== correct) candidates.add(text)
     }
   }
@@ -80,7 +81,7 @@ const KATAKANA = /[ァ-ヶ]/g
 export function normalizeAnswer(text: string): string {
   return text
     .normalize('NFKC')
-    .replace(/[\s。、，,.・～〜~!?！？「」]/g, '')
+    .replace(/[\s。、，,.・～〜~!?！？「」…＿_]/g, '')
     .replace(KATAKANA, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60))
     .toLowerCase()
 }

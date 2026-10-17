@@ -38,6 +38,23 @@ export interface StartOptions {
   pool?: readonly Dataset[]
 }
 
+/** M5 之前存的是「開啟的」方向清單，當時只有這五種 */
+const LEGACY_MODE_IDS: readonly QuizModeId[] = [
+  'vocab-kanji-to-zh',
+  'vocab-kana-to-zh',
+  'vocab-zh-to-jp',
+  'grammar-pattern-to-zh',
+  'grammar-zh-to-pattern',
+]
+
+function loadDisabledModes(modesKey: string): QuizModeId[] {
+  const disabled = loadJSON<QuizModeId[] | null>(`${modesKey}-disabled`, null)
+  if (Array.isArray(disabled)) return disabled.filter((m) => QUIZ_MODE_IDS.includes(m))
+  const legacyEnabled = loadJSON<QuizModeId[] | null>(modesKey, null)
+  if (Array.isArray(legacyEnabled)) return LEGACY_MODE_IDS.filter((m) => !legacyEnabled.includes(m))
+  return []
+}
+
 /** 學習與測驗各用一個獨立的 store，互不干擾 */
 function defineSessionStore(id: string, modesKey: string) {
   return defineStore(id, () => {
@@ -56,8 +73,11 @@ function defineSessionStore(id: string, modesKey: string) {
     const firstGrades = ref<Record<string, Grade>>({})
     const reviewCount = ref(0)
 
-    const savedModes = loadJSON<QuizModeId[]>(modesKey, [...QUIZ_MODE_IDS])
-    const enabledModes = ref<QuizModeId[]>(savedModes.filter((m) => QUIZ_MODE_IDS.includes(m)))
+    // 存「關閉的」方向，之後新增的測驗方向預設就會開啟
+    const disabledModes = ref<QuizModeId[]>(loadDisabledModes(modesKey))
+    const enabledModes = computed<QuizModeId[]>(() =>
+      QUIZ_MODE_IDS.filter((m) => !disabledModes.value.includes(m)),
+    )
 
     const status = computed<SessionStatus>(() => {
       if (queue.value.length === 0) return 'setup'
@@ -88,10 +108,10 @@ function defineSessionStore(id: string, modesKey: string) {
     })
 
     function toggleMode(modeId: QuizModeId): void {
-      enabledModes.value = enabledModes.value.includes(modeId)
-        ? enabledModes.value.filter((m) => m !== modeId)
-        : [...enabledModes.value, modeId]
-      saveJSON(modesKey, enabledModes.value)
+      disabledModes.value = disabledModes.value.includes(modeId)
+        ? disabledModes.value.filter((m) => m !== modeId)
+        : [...disabledModes.value, modeId]
+      saveJSON(`${modesKey}-disabled`, disabledModes.value)
     }
 
     function entryFor(card: StudyCard): SessionEntry {

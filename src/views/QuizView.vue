@@ -6,7 +6,7 @@ import { storeToRefs } from 'pinia'
 import AnswerMethodPicker from '@/components/AnswerMethodPicker.vue'
 import ModePicker from '@/components/ModePicker.vue'
 import SessionPanel from '@/components/SessionPanel.vue'
-import { buildPracticeDeck } from '@/lib/deck'
+import { buildPracticeDeck, countPracticeItems } from '@/lib/deck'
 import { getQuizMode } from '@/lib/quizModes'
 import { loadJSON, saveJSON } from '@/lib/storage'
 import { useDatasetsStore } from '@/stores/datasets'
@@ -24,11 +24,7 @@ const COUNT_OPTIONS = [10, 20, 50, 0] as const
 /** 題數；0 表示全部 */
 const questionCount = ref<number>(loadJSON<number>('quiz-count', 20))
 
-const available = computed(() =>
-  selectedDatasets.value
-    .filter((d) => enabledModes.value.some((id) => getQuizMode(id).category === d.category))
-    .reduce((sum, d) => sum + d.data.length, 0),
-)
+const available = computed(() => countPracticeItems(selectedDatasets.value, enabledModes.value))
 const actualCount = computed(() =>
   questionCount.value === 0 ? available.value : Math.min(questionCount.value, available.value),
 )

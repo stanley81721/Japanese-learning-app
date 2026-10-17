@@ -2,6 +2,7 @@
 import { watchEffect } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 
+import UpdatePrompt from '@/components/UpdatePrompt.vue'
 import { useSettingsStore } from '@/stores/settings'
 
 const settings = useSettingsStore()
@@ -36,6 +37,8 @@ const navItems = [
   <main class="app-main">
     <RouterView />
   </main>
+
+  <UpdatePrompt />
 </template>
 
 <style scoped>

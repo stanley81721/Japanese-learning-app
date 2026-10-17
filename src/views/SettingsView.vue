@@ -6,12 +6,14 @@ import AnswerMethodPicker from '@/components/AnswerMethodPicker.vue'
 import { backupFileName, createBackup, downloadJSON, parseBackup } from '@/lib/backup'
 import { useDatasetsStore } from '@/stores/datasets'
 import { useProgressStore } from '@/stores/progress'
-import { THEMES, useSettingsStore } from '@/stores/settings'
+import { THEMES, TTS_RATE_MAX, TTS_RATE_MIN, useSettingsStore } from '@/stores/settings'
+import { useSpeechStore } from '@/stores/speech'
 
 const settings = useSettingsStore()
 const progress = useProgressStore()
 const datasetsStore = useDatasetsStore()
-const { newCardsPerDay, theme } = storeToRefs(settings)
+const speech = useSpeechStore()
+const { newCardsPerDay, theme, ttsAutoplay, ttsRate } = storeToRefs(settings)
 const { datasets } = storeToRefs(datasetsStore)
 
 /** 操作結果訊息 */
@@ -118,6 +120,41 @@ onMounted(() => datasetsStore.ensureLoaded())
     </div>
 
     <div class="panel">
+      <h2>發音</h2>
+      <template v-if="speech.available">
+        <p class="muted small">使用語音：{{ speech.voice?.name }}</p>
+        <label class="row">
+          <input v-model="ttsAutoplay" type="checkbox" />
+          翻面或作答後自動朗讀
+        </label>
+        <label class="row">
+          速度
+          <input
+            v-model.number="ttsRate"
+            type="range"
+            :min="TTS_RATE_MIN"
+            :max="TTS_RATE_MAX"
+            step="0.1"
+          />
+          <span class="rate">{{ ttsRate.toFixed(1) }}×</span>
+        </label>
+        <div class="actions">
+          <button
+            type="button"
+            class="btn"
+            @click="speech.speak('こんにちは。日本語を勉強しましょう。')"
+          >
+            試聽
+          </button>
+        </div>
+      </template>
+      <p v-else class="muted small">
+        這個裝置或瀏覽器沒有可用的日文語音，所以發音按鈕不會顯示。可以在作業系統的語言設定中安裝日文語音後重新開啟
+        App。
+      </p>
+    </div>
+
+    <div class="panel">
       <h2>備份</h2>
       <p class="muted small">
         學習進度只存在這個瀏覽器中。清除瀏覽器資料或換裝置前，請先匯出備份檔。
@@ -201,6 +238,15 @@ h1 {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.row + .row {
+  margin-top: 0.5rem;
+}
+
+.rate {
+  min-width: 2.5rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .number-input {

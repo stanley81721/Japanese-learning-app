@@ -17,13 +17,22 @@ export interface Settings {
   /** 啟用的作答方式；每題從中隨機挑選 */
   answerMethods: AnswerMethod[]
   theme: Theme
+  /** 翻面（或作答）後自動朗讀日文 */
+  ttsAutoplay: boolean
+  /** 朗讀速度 0.5–1.5 */
+  ttsRate: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   newCardsPerDay: 20,
   answerMethods: [...ANSWER_METHOD_IDS],
   theme: 'system',
+  ttsAutoplay: false,
+  ttsRate: 0.9,
 }
+
+export const TTS_RATE_MIN = 0.5
+export const TTS_RATE_MAX = 1.5
 
 type RawSettings = Partial<Record<keyof Settings, unknown>>
 
@@ -50,6 +59,11 @@ export function sanitizeSettings(raw: unknown): Settings {
     newCardsPerDay: validNewCards(s.newCardsPerDay) ?? DEFAULT_SETTINGS.newCardsPerDay,
     answerMethods: validMethods(s.answerMethods) ?? [...DEFAULT_SETTINGS.answerMethods],
     theme: validTheme(s.theme) ?? DEFAULT_SETTINGS.theme,
+    ttsAutoplay: typeof s.ttsAutoplay === 'boolean' ? s.ttsAutoplay : DEFAULT_SETTINGS.ttsAutoplay,
+    ttsRate:
+      typeof s.ttsRate === 'number' && s.ttsRate >= TTS_RATE_MIN && s.ttsRate <= TTS_RATE_MAX
+        ? s.ttsRate
+        : DEFAULT_SETTINGS.ttsRate,
   }
 }
 
@@ -59,16 +73,22 @@ export const useSettingsStore = defineStore('settings', () => {
   const newCardsPerDay = ref(initial.newCardsPerDay)
   const answerMethods = ref<AnswerMethod[]>(initial.answerMethods)
   const theme = ref<Theme>(initial.theme)
+  const ttsAutoplay = ref(initial.ttsAutoplay)
+  const ttsRate = ref(initial.ttsRate)
 
   function snapshot(): Settings {
     return {
       newCardsPerDay: newCardsPerDay.value,
       answerMethods: [...answerMethods.value],
       theme: theme.value,
+      ttsAutoplay: ttsAutoplay.value,
+      ttsRate: ttsRate.value,
     }
   }
 
-  watch([newCardsPerDay, answerMethods, theme], () => saveJSON('settings', snapshot()))
+  watch([newCardsPerDay, answerMethods, theme, ttsAutoplay, ttsRate], () =>
+    saveJSON('settings', snapshot()),
+  )
 
   /** 切換作答方式；至少保留一種 */
   function toggleAnswerMethod(method: AnswerMethod) {
@@ -89,7 +109,18 @@ export const useSettingsStore = defineStore('settings', () => {
     newCardsPerDay.value = next.newCardsPerDay
     answerMethods.value = next.answerMethods
     theme.value = next.theme
+    ttsAutoplay.value = next.ttsAutoplay
+    ttsRate.value = next.ttsRate
   }
 
-  return { newCardsPerDay, answerMethods, theme, snapshot, toggleAnswerMethod, restore }
+  return {
+    newCardsPerDay,
+    answerMethods,
+    theme,
+    ttsAutoplay,
+    ttsRate,
+    snapshot,
+    toggleAnswerMethod,
+    restore,
+  }
 })

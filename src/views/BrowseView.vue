@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import MarkedSentence from '@/components/MarkedSentence.vue'
+import SpeakButton from '@/components/SpeakButton.vue'
+import { stripMarkup } from '@/lib/grammarMarkup'
 import { useDatasetsStore } from '@/stores/datasets'
 import { CATEGORY_LABELS, type GrammarItem, type VocabularyItem } from '@/types/dataset'
 
@@ -54,6 +56,12 @@ function readingOf(item: Item): string | undefined {
   return reading && reading !== item.japanese ? reading : undefined
 }
 
+/** 單字念讀音，文法念原形（去掉～） */
+function speechOf(item: Item): string {
+  if ('hiragana' in item && item.hiragana?.trim()) return item.hiragana.trim()
+  return item.japanese.replace(/[～〜]/g, '')
+}
+
 function hasDetails(item: Item): boolean {
   return Boolean(item.full_explanation || ('examples' in item && item.examples?.length))
 }
@@ -93,27 +101,31 @@ onMounted(() => store.ensureLoaded())
         </h2>
         <ul class="item-list">
           <li v-for="item in items" :key="item.id" class="item">
-            <button
-              type="button"
-              class="item-row"
-              :aria-expanded="
-                hasDetails(item) ? expanded.has(rowKey(dataset.id, item.id)) : undefined
-              "
-              :disabled="!hasDetails(item)"
-              @click="toggle(rowKey(dataset.id, item.id))"
-            >
-              <span class="jp" lang="ja">{{ item.japanese }}</span>
-              <span class="reading" lang="ja">{{ readingOf(item) }}</span>
-              <span class="zh">{{ item.simple_chinese }}</span>
-              <span v-if="hasDetails(item)" class="chevron" aria-hidden="true">
-                {{ expanded.has(rowKey(dataset.id, item.id)) ? '▾' : '▸' }}
-              </span>
-            </button>
+            <div class="item-head">
+              <button
+                type="button"
+                class="item-row"
+                :aria-expanded="
+                  hasDetails(item) ? expanded.has(rowKey(dataset.id, item.id)) : undefined
+                "
+                :disabled="!hasDetails(item)"
+                @click="toggle(rowKey(dataset.id, item.id))"
+              >
+                <span class="jp" lang="ja">{{ item.japanese }}</span>
+                <span class="reading" lang="ja">{{ readingOf(item) }}</span>
+                <span class="zh">{{ item.simple_chinese }}</span>
+                <span v-if="hasDetails(item)" class="chevron" aria-hidden="true">
+                  {{ expanded.has(rowKey(dataset.id, item.id)) ? '▾' : '▸' }}
+                </span>
+              </button>
+              <SpeakButton class="row-speak" :text="speechOf(item)" />
+            </div>
             <div v-if="expanded.has(rowKey(dataset.id, item.id))" class="details">
               <MarkdownContent v-if="item.full_explanation" :source="item.full_explanation" />
               <ul v-if="'examples' in item && item.examples?.length" class="examples">
                 <li v-for="(example, i) in item.examples" :key="i">
                   <MarkedSentence :sentence="example.sentence" />
+                  <SpeakButton :text="stripMarkup(example.sentence)" />
                   <div v-if="example.translation" class="muted small">
                     {{ example.translation }}
                   </div>
@@ -189,7 +201,18 @@ h1 {
   border-top: 1px solid var(--color-border);
 }
 
+.item-head {
+  display: flex;
+  align-items: center;
+}
+
+.row-speak {
+  margin-right: 0.5rem;
+}
+
 .item-row {
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(6rem, 1fr) minmax(5rem, 1fr) 2fr 1rem;
   gap: 0.75rem;

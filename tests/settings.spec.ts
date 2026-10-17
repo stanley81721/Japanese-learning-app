@@ -10,7 +10,7 @@ import { MATURE_INTERVAL, dailySeries, maturityFor, niceTicks, streak } from '@/
 import { routes } from '@/router'
 import { useDatasetsStore } from '@/stores/datasets'
 import { useProgressStore } from '@/stores/progress'
-import { sanitizeSettings, useSettingsStore } from '@/stores/settings'
+import { DEFAULT_SETTINGS, sanitizeSettings, useSettingsStore } from '@/stores/settings'
 import type { Dataset } from '@/types/dataset'
 
 const NOW = new Date(2026, 9, 17, 12, 0).getTime()
@@ -102,12 +102,10 @@ describe('settings', () => {
       newCardsPerDay: 5,
       answerMethods: ['input'],
       theme: 'dark',
+      ttsAutoplay: false,
+      ttsRate: 0.9,
     })
-    expect(sanitizeSettings('nope')).toEqual({
-      newCardsPerDay: 20,
-      answerMethods: ['flip', 'choice', 'input'],
-      theme: 'system',
-    })
+    expect(sanitizeSettings('nope')).toEqual(DEFAULT_SETTINGS)
   })
 
   it('restores settings and persists them', async () => {
@@ -115,8 +113,8 @@ describe('settings', () => {
     await flushPromises()
     setActivePinia(createPinia())
     expect(useSettingsStore().snapshot()).toEqual({
+      ...DEFAULT_SETTINGS,
       newCardsPerDay: 7,
-      answerMethods: ['flip', 'choice', 'input'],
       theme: 'light',
     })
   })

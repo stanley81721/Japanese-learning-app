@@ -4,8 +4,11 @@ import { storeToRefs } from 'pinia'
 
 import FlashCard from '@/components/FlashCard.vue'
 import GradeButtons from '@/components/GradeButtons.vue'
+import SpeakButton from '@/components/SpeakButton.vue'
 import { getQuizMode } from '@/lib/quizModes'
 import type { Grade } from '@/lib/srs'
+import { useSettingsStore } from '@/stores/settings'
+import { useSpeechStore } from '@/stores/speech'
 import type { SessionStore } from '@/stores/studySession'
 
 const props = defineProps<{
@@ -52,6 +55,23 @@ watch(response, async (r) => {
   continueEl.value?.focus()
 })
 
+// 發音：題目是日文時正面就能聽；否則翻面（或作答）後才能，以免洩漏答案
+const settings = useSettingsStore()
+const speech = useSpeechStore()
+const canSpeak = computed(
+  () => Boolean(currentEntry.value) && (card.value.speakOnFront || flipped.value),
+)
+
+function speakCard() {
+  if (canSpeak.value) speech.speak(card.value.speech)
+}
+
+watch(flipped, (isFlipped) => {
+  if (isFlipped && settings.ttsAutoplay) speakCard()
+})
+watch(index, () => speech.cancel())
+onBeforeUnmount(() => speech.cancel())
+
 function onCardClick() {
   if (method.value === 'flip') props.session.flip()
 }
@@ -80,6 +100,11 @@ function onKeydown(event: KeyboardEvent) {
   if (target?.closest('input, textarea, select')) return
   const onButton = Boolean(target?.closest('button'))
   const isConfirmKey = event.key === ' ' || event.key === 'Enter'
+
+  if (event.key === 'p' || event.key === 'P') {
+    speakCard()
+    return
+  }
 
   if (response.value) {
     // 焦點在按鈕上時讓按鈕自己處理，避免觸發兩次
@@ -128,6 +153,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :aria-valuemax="queue.length"
     >
       <div class="progress-bar" :style="{ width: `${progressPercent}%` }" />
+    </div>
+
+    <div class="card-tools">
+      <SpeakButton v-if="canSpeak" :text="card.speech" shortcut="P" />
     </div>
 
     <FlashCard
@@ -262,6 +291,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   height: 100%;
   background: var(--color-primary);
   transition: width 0.2s ease;
+}
+
+/* 固定高度，發音按鈕出現或消失時卡片不會跳動 */
+.card-tools {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 1.875rem;
+  margin: -0.5rem 0 0.25rem;
 }
 
 .choices {

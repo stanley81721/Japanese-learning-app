@@ -92,6 +92,33 @@ export interface StudyCard {
   back: CardFace
   /** 答案是日文時，輸入作答可接受的寫法（漢字、讀音） */
   answers?: string[]
+  /** 朗讀用的日文 */
+  speech: string
+  /** 正面就能朗讀（題目本身是日文）；否則要翻面後才能，以免洩漏答案 */
+  speakOnFront: boolean
+}
+
+const SPEAK_ON_FRONT: readonly QuizModeId[] = [
+  'vocab-kanji-to-zh',
+  'vocab-kana-to-zh',
+  'grammar-pattern-to-zh',
+  'grammar-sentence-to-zh',
+]
+
+/** 單字念讀音（避免 TTS 讀錯漢字），文法念原形（去掉～），例句念整句 */
+function speechFor(
+  modeId: QuizModeId,
+  item: VocabularyItem | GrammarItem,
+  front: CardFace,
+  back: CardFace,
+): string {
+  const sentence = front.sentence ?? back.sub?.sentence
+  if (sentence) return stripMarkup(sentence)
+  if (getQuizMode(modeId).category === 'vocabulary') {
+    const v = item as VocabularyItem
+    return v.hiragana?.trim() || v.japanese
+  }
+  return item.japanese.replace(/[～〜]/g, '')
 }
 
 const ja = (text: string): CardText => ({ text, lang: 'ja' })
@@ -198,12 +225,15 @@ export function buildCard(
   modeId: QuizModeId,
   random: RandomFn = Math.random,
 ): StudyCard {
+  const f = faces(modeId, item, random)
   return {
     key: `${dataset.id}:${item.id}:${modeId}`,
     datasetId: dataset.id,
     datasetName: dataset.name,
     itemId: item.id,
     modeId,
-    ...faces(modeId, item, random),
+    ...f,
+    speech: speechFor(modeId, item, f.front, f.back),
+    speakOnFront: SPEAK_ON_FRONT.includes(modeId),
   }
 }

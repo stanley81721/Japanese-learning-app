@@ -25,12 +25,13 @@ export const useProgressStore = defineStore('progress', () => {
   const cards = ref<Record<string, CardProgress>>(loadedCards ?? {})
   const history = ref<Record<string, DayStats>>(loadedHistory ?? {})
 
-  // 存的資料格式無法辨識時不要覆寫，以免把使用者的進度清掉
-  const readOnly = loadedCards === null || loadedHistory === null
+  // 存的資料格式無法辨識時不要覆寫，以免把使用者的進度清掉；
+  // 使用者主動匯入或全部重置時才解除
+  const readOnly = ref(loadedCards === null || loadedHistory === null)
   const saveFailed = ref(false)
 
   function persist() {
-    if (readOnly) return
+    if (readOnly.value) return
     const ok =
       saveVersioned(PROGRESS_KEY, VERSION, cards.value) &&
       saveVersioned(HISTORY_KEY, VERSION, history.value)
@@ -78,6 +79,22 @@ export const useProgressStore = defineStore('progress', () => {
     persist()
   }
 
+  /** 用備份檔取代全部進度（已先由 parseBackup 驗證） */
+  function replaceAll(
+    nextCards: Record<string, CardProgress>,
+    nextHistory: Record<string, DayStats>,
+  ) {
+    cards.value = nextCards
+    history.value = nextHistory
+    readOnly.value = false
+    persist()
+  }
+
+  /** 清除所有進度與每日統計 */
+  function resetAll() {
+    replaceAll({}, {})
+  }
+
   const totalCards = computed(() => Object.keys(cards.value).length)
 
   return {
@@ -91,5 +108,7 @@ export const useProgressStore = defineStore('progress', () => {
     statsFor,
     review,
     resetDataset,
+    replaceAll,
+    resetAll,
   }
 })

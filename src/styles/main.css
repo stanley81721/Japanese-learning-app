@@ -15,6 +15,12 @@
   --color-vocab-soft: #ccfbf1;
   --color-grammar: #b45309;
   --color-grammar-soft: #fef3c7;
+  /* 圖表：單一數列與熟練度（同一色相由淺到深，已用 dataviz 驗證工具檢查） */
+  --viz-series: #2a78d6;
+  --viz-unseen: #e1e0d9;
+  --viz-step-1: #86b6ef;
+  --viz-step-2: #3987e5;
+  --viz-step-3: #1c5cab;
   --radius: 8px;
 
   --font-sans:
@@ -42,10 +48,21 @@
     --color-vocab-soft: #134e4a;
     --color-grammar: #fcd34d;
     --color-grammar-soft: #451a03;
+    --viz-series: #3987e5;
+    --viz-unseen: #374151;
+    --viz-step-1: #184f95;
+    --viz-step-2: #3987e5;
+    --viz-step-3: #86b6ef;
   }
 }
 
+/* 手動選擇主題時，原生控制項（捲軸、輸入框）也跟著切換 */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
 :root[data-theme='dark'] {
+  color-scheme: dark;
   --color-bg: #0b1120;
   --color-surface: #111827;
   --color-text: #e5e7eb;
@@ -62,6 +79,11 @@
   --color-vocab-soft: #134e4a;
   --color-grammar: #fcd34d;
   --color-grammar-soft: #451a03;
+  --viz-series: #3987e5;
+  --viz-unseen: #374151;
+  --viz-step-1: #184f95;
+  --viz-step-2: #3987e5;
+  --viz-step-3: #86b6ef;
 }
 
 *,

@@ -1,5 +1,17 @@
 <script setup lang="ts">
+import { watchEffect } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
+
+import { useSettingsStore } from '@/stores/settings'
+
+const settings = useSettingsStore()
+
+// 主題：跟隨系統時移除 data-theme，交給 prefers-color-scheme 決定
+watchEffect(() => {
+  const root = document.documentElement
+  if (settings.theme === 'system') delete root.dataset.theme
+  else root.dataset.theme = settings.theme
+})
 
 const navItems = [
   { to: '/', label: '首頁' },

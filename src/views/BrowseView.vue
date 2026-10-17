@@ -99,6 +99,7 @@ onMounted(() => store.ensureLoaded())
             >{{ CATEGORY_LABELS[dataset.category] }}・{{ dataset.level }}</span
           >
         </h2>
+        <p v-if="dataset.source" class="muted small source">來源：{{ dataset.source }}</p>
         <ul class="item-list">
           <li v-for="item in items" :key="item.id" class="item">
             <div class="item-head">
@@ -199,6 +200,10 @@ h1 {
 
 .item + .item {
   border-top: 1px solid var(--color-border);
+}
+
+.source {
+  margin: -0.25rem 0 0.5rem;
 }
 
 .item-head {

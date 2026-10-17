@@ -33,6 +33,7 @@ describe('App', () => {
     const chip = (label: string) => wrapper.findAll('button.chip').find((b) => b.text() === label)!
 
     await chip('文法').trigger('click')
+    await chip('範例').trigger('click')
     expect(wrapper.findAll('.dataset-card')).toHaveLength(1)
 
     await wrapper.find('.dataset-card input').setValue(true)
@@ -40,6 +41,28 @@ describe('App', () => {
 
     await chip('N5').trigger('click')
     expect(wrapper.text()).toContain('沒有符合條件的資料集。')
+  })
+
+  it('filters by series and selects a whole series at once', async () => {
+    const wrapper = await mountAt('/')
+    const chip = (label: string) => wrapper.findAll('button.chip').find((b) => b.text() === label)!
+
+    await chip('N3 單字（tanos 清單）').trigger('click')
+    expect(wrapper.findAll('.dataset-card').map((c) => c.find('.dataset-name').text())).toEqual([
+      'N3 單字 01（あっ〜一致）',
+      'N3 單字 02（いつでも〜起こる）',
+    ])
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === '全選')!
+      .trigger('click')
+    expect(wrapper.find('.selection-bar').text()).toContain('已選 2 份，共 200 筆')
+
+    // 切到文法後，單字系列不存在了，系列篩選回到「全部」
+    await chip('文法').trigger('click')
+    expect(wrapper.find('[aria-label="系列"] [aria-checked="true"]').text()).toBe('全部')
+    expect(wrapper.findAll('.dataset-card')).toHaveLength(2)
   })
 
   it.each([

@@ -40,6 +40,10 @@ export interface GrammarItem {
 interface DatasetFileBase {
   name: string
   level: Level
+  /** 系列名稱，例如「N3 單字（tanos）」；同系列拆成多個檔案時可在首頁一起篩選 */
+  series?: string
+  /** 資料來源與授權說明 */
+  source?: string
 }
 
 export interface VocabularyDatasetFile extends DatasetFileBase {

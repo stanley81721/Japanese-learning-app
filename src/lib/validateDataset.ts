@@ -96,6 +96,9 @@ export function validateDataset(raw: unknown): ValidationResult {
   const errors: string[] = []
 
   if (!isNonEmptyString(raw.name)) errors.push('缺少 name')
+  for (const key of ['series', 'source'] as const) {
+    if (raw[key] !== undefined && !isNonEmptyString(raw[key])) errors.push(`${key} 必須是非空字串`)
+  }
 
   const category = raw.category
   const validCategory = (CATEGORIES as readonly unknown[]).includes(category)

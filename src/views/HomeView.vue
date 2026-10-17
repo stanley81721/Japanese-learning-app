@@ -5,7 +5,12 @@ import { storeToRefs } from 'pinia'
 
 import FilterChips from '@/components/FilterChips.vue'
 import { countDataset, type DatasetCounts } from '@/lib/queue'
-import { useDatasetsStore, type CategoryFilter, type LevelFilter } from '@/stores/datasets'
+import {
+  NO_SERIES,
+  useDatasetsStore,
+  type CategoryFilter,
+  type LevelFilter,
+} from '@/stores/datasets'
 import { useProgressStore } from '@/stores/progress'
 import { useStudySessionStore } from '@/stores/studySession'
 import { CATEGORIES, CATEGORY_LABELS, LEVELS, type Dataset } from '@/types/dataset'
@@ -19,6 +24,8 @@ const {
   loadErrors,
   categoryFilter,
   levelFilter,
+  seriesFilter,
+  seriesOptions,
   filteredDatasets,
   selectedDatasets,
   selectedItemCount,
@@ -28,6 +35,12 @@ const categoryOptions: { value: CategoryFilter; label: string }[] = [
   { value: 'all', label: '全部' },
   ...CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABELS[c] })),
 ]
+
+/** 系列篩選的選項；只有一個系列時模板不顯示這排篩選 */
+const seriesChipOptions = computed(() => [
+  { value: 'all', label: '全部' },
+  ...seriesOptions.value.map((s) => ({ value: s, label: s === NO_SERIES ? '其他' : s })),
+])
 
 const levelOptions: { value: LevelFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -54,6 +67,12 @@ onMounted(() => store.ensureLoaded())
     <div class="filters">
       <FilterChips v-model="categoryFilter" label="分類" :options="categoryOptions" />
       <FilterChips v-model="levelFilter" label="等級" :options="levelOptions" />
+      <FilterChips
+        v-if="seriesOptions.length > 1"
+        v-model="seriesFilter"
+        label="系列"
+        :options="seriesChipOptions"
+      />
     </div>
 
     <p v-if="status !== 'ready'" class="muted">載入中…</p>

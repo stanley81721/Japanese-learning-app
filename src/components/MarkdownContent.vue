@@ -10,5 +10,6 @@ const html = computed(() => renderMarkdown(props.source))
 
 <template>
   <!-- eslint-disable-next-line vue/no-v-html -->
-  <div class="markdown" lang="ja" v-html="html" />
+  <!-- 解釋以中文為主、夾雜日文 -->
+  <div class="markdown" lang="zh-Hant" v-html="html" />
 </template>

@@ -8,6 +8,10 @@ import type { Category, Dataset, DatasetLoadError, Level } from '@/types/dataset
 export type CategoryFilter = Category | 'all'
 export type LevelFilter = Level | 'all'
 
+/** 沒有設定 series 的資料集在系列篩選中的代表值 */
+export const NO_SERIES = ''
+export const seriesOf = (d: Dataset): string => d.series ?? NO_SERIES
+
 export const useDatasetsStore = defineStore('datasets', () => {
   const datasets = ref<Dataset[]>([])
   const loadErrors = ref<DatasetLoadError[]>([])
@@ -15,6 +19,7 @@ export const useDatasetsStore = defineStore('datasets', () => {
 
   const categoryFilter = ref<CategoryFilter>('all')
   const levelFilter = ref<LevelFilter>('all')
+  const seriesFilter = ref<string>('all')
   // 選取的資料集記在瀏覽器裡，重新整理或直接開啟 #/study 時仍保留
   const selectedIds = ref<string[]>(loadJSON<string[]>('selected-datasets', []))
   watch(selectedIds, (ids) => saveJSON('selected-datasets', ids))
@@ -37,11 +42,30 @@ export const useDatasetsStore = defineStore('datasets', () => {
     return pending
   }
 
+  const matchesCategoryAndLevel = (d: Dataset) =>
+    (categoryFilter.value === 'all' || d.category === categoryFilter.value) &&
+    (levelFilter.value === 'all' || d.level === levelFilter.value)
+
+  /** 目前分類與等級下有哪些系列；沒有 series 的資料集歸在 NO_SERIES */
+  const seriesOptions = computed(() => {
+    const names = new Set(datasets.value.filter(matchesCategoryAndLevel).map(seriesOf))
+    return [...names].sort((a, b) =>
+      a === NO_SERIES ? 1 : b === NO_SERIES ? -1 : a.localeCompare(b, 'ja'),
+    )
+  })
+
+  // 換了分類或等級後，原本選的系列可能不存在了，就改回全部
+  watch(seriesOptions, (options) => {
+    if (seriesFilter.value !== 'all' && !options.includes(seriesFilter.value)) {
+      seriesFilter.value = 'all'
+    }
+  })
+
   const filteredDatasets = computed(() =>
     datasets.value.filter(
       (d) =>
-        (categoryFilter.value === 'all' || d.category === categoryFilter.value) &&
-        (levelFilter.value === 'all' || d.level === levelFilter.value),
+        matchesCategoryAndLevel(d) &&
+        (seriesFilter.value === 'all' || seriesOf(d) === seriesFilter.value),
     ),
   )
 
@@ -80,6 +104,8 @@ export const useDatasetsStore = defineStore('datasets', () => {
     status,
     categoryFilter,
     levelFilter,
+    seriesFilter,
+    seriesOptions,
     selectedIds,
     filteredDatasets,
     selectedDatasets,

@@ -1,16 +1,20 @@
-// 檢查 data/ 中實際資料集的內容品質（格式本身由 validateDataset 檢查）
-import { describe, expect, it } from 'vitest'
+// 檢查 data/ 中正式資料集的內容品質（格式本身由 validateDataset 檢查）。
+// 其他測試用的是 tests/fixtures 的範例資料（見 tests/setup.ts），這裡要讀真正的 data/。
+import { describe, expect, it, vi } from 'vitest'
 
-import { loadDatasets } from '@/data/loader'
 import { checkGrammarMarkup, validateDataset } from '@/lib/validateDataset'
 import type { GrammarItem, VocabularyItem } from '@/types/dataset'
 
+const { loadDatasets } = await vi.importActual<typeof import('@/data/loader')>('@/data/loader')
 const { datasets, errors } = await loadDatasets()
 const bySeries = (series: string) => datasets.filter((d) => d.series === series)
+const VOCAB_SERIES = 'N3 單字（tanos 清單）'
 
 describe('data/ datasets', () => {
-  it('all load without errors', () => {
+  it('all load without errors and none are samples', () => {
     expect(errors).toEqual([])
+    expect(datasets.length).toBeGreaterThan(0)
+    expect(datasets.filter((d) => d.series?.includes('範例'))).toEqual([])
   })
 
   it('item ids are unique across all datasets', () => {
@@ -18,10 +22,8 @@ describe('data/ datasets', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('every dataset in a real series shares category, level, and source', () => {
-    // 「範例」刻意混合不同分類與等級，不列入檢查
-    const series = new Set(datasets.map((d) => d.series).filter((s) => s && s !== '範例'))
-    for (const name of series) {
+  it('every dataset in a series shares category, level, and source', () => {
+    for (const name of new Set(datasets.map((d) => d.series).filter(Boolean))) {
       const group = bySeries(name!)
       expect(new Set(group.map((d) => `${d.category}/${d.level}/${d.source ?? ''}`)).size).toBe(1)
     }
@@ -29,19 +31,38 @@ describe('data/ datasets', () => {
 })
 
 describe('N3 tanos vocabulary', () => {
-  const words = bySeries('N3 單字（tanos 清單）').flatMap((d) => d.data as VocabularyItem[])
+  const files = bySeries(VOCAB_SERIES)
+  const words = files.flatMap((d) => d.data as VocabularyItem[])
 
-  it('has 200 words with a source note', () => {
-    expect(words).toHaveLength(200)
-    for (const d of bySeries('N3 單字（tanos 清單）')) expect(d.source).toContain('CC BY')
+  it('has all 1806 words in 19 evenly sized files with a source note', () => {
+    expect(words).toHaveLength(1806)
+    expect(files).toHaveLength(19)
+    for (const d of files) {
+      expect([95, 96]).toContain(d.data.length)
+      expect(d.source).toContain('CC BY')
+    }
   })
 
-  it('every word has a reading (unless written in kana), usage, and an example with translation', () => {
+  it('is shuffled rather than in kana order', () => {
+    const ids = files[0]!.data.map((w) => w.id)
+    expect(ids).not.toEqual([...ids].sort())
+    // 每個檔案都混有清單前段與後段的單字
+    for (const d of files) {
+      const numbers = d.data.map((w) => Number(w.id.slice(-4)))
+      expect(Math.min(...numbers)).toBeLessThan(300)
+      expect(Math.max(...numbers)).toBeGreaterThan(1500)
+    }
+  })
+
+  it('every word has a kana reading (unless written in kana), usage, and an example with translation', () => {
     for (const w of words) {
-      const kanaOnly = /^[぀-ヿ・ー]+$/.test(w.japanese)
-      if (!kanaOnly) expect(w.hiragana, w.id).toMatch(/^[぀-ゟー]+$/)
-      expect(w.full_explanation, w.id).toContain('**用法**')
-      expect(w.full_explanation, w.id).toMatch(/\*\*例句\*\*：.+\n\n（.+）$/)
+      if (w.hiragana !== undefined) {
+        expect(w.hiragana, w.id).toMatch(/^[぀-ヿー]+$/)
+        expect(w.hiragana, w.id).not.toBe(w.japanese)
+      } else {
+        expect(w.japanese, w.id).toMatch(/^[぀-ヿー]+$/)
+      }
+      expect(w.full_explanation, w.id).toMatch(/^\*\*用法\*\*：.+\n\n\*\*例句\*\*：.+\n\n（.+）$/)
     }
   })
 })
@@ -49,8 +70,8 @@ describe('N3 tanos vocabulary', () => {
 describe('N3 grammar', () => {
   const items = bySeries('N3 文法').flatMap((d) => d.data as GrammarItem[])
 
-  it('has 30 grammar points, each with explanation and two translated examples', () => {
-    expect(items).toHaveLength(30)
+  it('every grammar point has an explanation and two translated, marked examples', () => {
+    expect(items.length).toBeGreaterThanOrEqual(30)
     for (const g of items) {
       expect(g.full_explanation, g.id).toContain('**接續**')
       expect(g.examples, g.id).toHaveLength(2)
@@ -59,6 +80,11 @@ describe('N3 grammar', () => {
         expect(ex.translation, g.id).toBeTruthy()
       }
     }
+  })
+
+  it('does not repeat a grammar pattern', () => {
+    const patterns = items.map((g) => g.japanese)
+    expect(new Set(patterns).size).toBe(patterns.length)
   })
 })
 

@@ -30,11 +30,15 @@ data/
 
 ### 資料來源與授權
 
-- `data/vocabulary/n3-tanos-*.json`：單字與讀音取自 [tanos.co.uk](https://www.tanos.co.uk/jlpt/) 的 JLPT N3 單字表，
-  由 Jonathan Waller 整理，以 Creative Commons BY 授權（經 [Bluskyo/JLPT_Vocabulary](https://github.com/Bluskyo/JLPT_Vocabulary) 轉成 CSV）。
-  中文意思、用法說明與例句為本專案自行撰寫。
-- `data/grammar/n3-grammar-*.json`：文法項目參考 JLPT N3 常見文法，說明與例句為本專案自行撰寫。
+- `data/vocabulary/n3-vocab-*.json`（1,806 個單字，分成 19 個檔案）：單字與讀音取自
+  [tanos.co.uk](https://www.tanos.co.uk/jlpt/) 的 JLPT N3 單字表，由 Jonathan Waller 整理，以 Creative Commons BY 授權
+  （經 [Bluskyo/JLPT_Vocabulary](https://github.com/Bluskyo/JLPT_Vocabulary) 轉成 CSV）。中文意思、用法說明與例句為本專案自行撰寫。
+  - 已修正原始清單中的讀音錯誤、斷行與被截斷的詞形；同字同義的重複項目合併，不同意思的保留。
+  - 單字的 `id`（`n3-tanos-0001`～`1806`）依清整後的清單順序編號；檔案內的順序則以固定種子打亂，
+    每個檔案都混有各個讀音開頭的單字。
+- `data/grammar/n3-grammar-*.json`（100 項）：文法項目參考 JLPT N3 常見文法，說明與例句為本專案自行撰寫。
 - 每個資料集的 `source` 欄位也記錄了來源，會顯示在「瀏覽」頁。
+- 介面測試使用 `tests/fixtures/data/` 的小型範例資料，不受正式資料增減影響。
 
 資料集可以加上 `series`（系列）欄位，同系列拆成多個檔案時，首頁可以用「系列」一起篩選。
 

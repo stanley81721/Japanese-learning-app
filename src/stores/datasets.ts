@@ -1,7 +1,8 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { loadDatasets, type DatasetModules } from '@/data/loader'
+import { loadJSON, saveJSON } from '@/lib/storage'
 import type { Category, Dataset, DatasetLoadError, Level } from '@/types/dataset'
 
 export type CategoryFilter = Category | 'all'
@@ -14,7 +15,9 @@ export const useDatasetsStore = defineStore('datasets', () => {
 
   const categoryFilter = ref<CategoryFilter>('all')
   const levelFilter = ref<LevelFilter>('all')
-  const selectedIds = ref<string[]>([])
+  // 選取的資料集記在瀏覽器裡，重新整理或直接開啟 #/study 時仍保留
+  const selectedIds = ref<string[]>(loadJSON<string[]>('selected-datasets', []))
+  watch(selectedIds, (ids) => saveJSON('selected-datasets', ids))
 
   let pending: Promise<void> | null = null
 

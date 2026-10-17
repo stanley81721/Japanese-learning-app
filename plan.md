@@ -34,7 +34,7 @@
 | 狀態管理 | Pinia | 管理資料集、學習階段、進度 |
 | 路由 | Vue Router（hash mode） | GitHub Pages 靜態部署不需伺服器 rewrite |
 | 樣式 | 原生 CSS + CSS 變數（或 UnoCSS / Tailwind，待定） | 支援深色模式與手機版 |
-| Markdown | markdown-it ＋ DOMPurify | 顯示 `full_explanation`，並過濾不安全的 HTML |
+| Markdown | markdown-it（`html: false`） | 顯示 `full_explanation`；原始 HTML 一律轉義、危險連結被擋，所以不需要另外引入 DOMPurify |
 | PWA／離線 | vite-plugin-pwa（Workbox） | 預先快取程式與 `data/` 的 JSON |
 | 發音 | Web Speech API（`speechSynthesis`，`ja-JP`） | 瀏覽器內建，不需外部服務 |
 | 測試 | Vitest（單元）＋ Playwright（E2E，選配） | SRS、洗牌、挖空邏輯需單元測試 |

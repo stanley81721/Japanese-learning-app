@@ -311,6 +311,8 @@ interface CardProgress {
 - **單元測試**：`srs.ts`（各評分的 interval／ease 變化）、`shuffle.ts`、`queue.ts`（每日上限、錯題重排）、`grammarMarkup.ts`（高亮／挖空）、`storage.ts`（遷移、匯入格式錯誤）
 - **資料驗證**：CI 中執行 `validate-data`，格式錯誤時建置失敗
 - **E2E（選配）**：選資料集 → 學習 → 評分 → 重新整理後進度仍在
+- **無障礙**：`tests/a11y.spec.ts` 用 axe-core 檢查每個頁面與學習中畫面的結構；顏色對比在瀏覽器中用 axe 檢查（淺色與深色、手機寬度）
+- **快捷鍵**：按 `?` 開啟快捷鍵說明；有跳到主要內容的連結；觸控裝置不顯示鍵盤提示
 
 ---
 

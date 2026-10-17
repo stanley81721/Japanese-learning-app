@@ -98,6 +98,8 @@ function onKeydown(event: KeyboardEvent) {
   // 事件可能直接發在 window 上（不是 Element）
   const target = event.target instanceof Element ? event.target : null
   if (target?.closest('input, textarea, select')) return
+  // 有對話框（例如快捷鍵說明）開著時不要操作後面的卡片
+  if (document.querySelector('[aria-modal="true"]')) return
   const onButton = Boolean(target?.closest('button'))
   const isConfirmKey = event.key === ' ' || event.key === 'Enter'
 
@@ -139,6 +141,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 <template>
   <div class="session" v-if="currentEntry">
+    <h1 class="visually-hidden">{{ label }}</h1>
     <div class="session-header">
       <span class="muted small">
         {{ label }}・{{ card.datasetName }}・{{ getQuizMode(card.modeId).label }}
@@ -148,6 +151,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <div
       class="progress"
       role="progressbar"
+      aria-label="本次進度"
       :aria-valuenow="index"
       aria-valuemin="0"
       :aria-valuemax="queue.length"

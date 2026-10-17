@@ -288,13 +288,4 @@ h1 {
 .reset-list li + li {
   border-top: 1px solid var(--color-border);
 }
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 </style>

@@ -14,7 +14,9 @@ const segments = computed(() => parseMarkedSentence(props.sentence))
 <template>
   <span lang="ja">
     <template v-for="(segment, i) in segments" :key="i">
-      <span v-if="segment.marked && cloze" class="cloze-blank" aria-label="空格">　</span>
+      <span v-if="segment.marked && cloze" class="cloze-blank"
+        ><span class="visually-hidden">（空格）</span></span
+      >
       <mark v-else-if="segment.marked" class="grammar-mark">{{ segment.text }}</mark>
       <template v-else>{{ segment.text }}</template>
     </template>

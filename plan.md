@@ -1,0 +1,280 @@
+# 日文單字卡 App 開發計畫
+
+> 類 Quizlet 的日文學習單字卡 Web App，支援「單字」與「文法」兩種資料集、間隔重複記憶演算法、洗牌，以及瀏覽器端進度儲存。
+
+---
+
+## 1. 目標與範圍
+
+### 1.1 目標
+- 純前端 Web App（無後端），可部署為靜態網站（例如 GitHub Pages）。
+- 從 `data/` 目錄載入 JSON 資料集，依 `category`（vocabulary / grammar）與 `level`（N5–N1）篩選。
+- 提供多種測驗方向（漢字→中文、平假名→中文、中文→日文、文法例句挖空…）。
+- 使用間隔重複（SRS）演算法安排複習，並搭配洗牌機制。
+- 學習進度存在瀏覽器（localStorage / IndexedDB），可匯出／匯入備份。
+
+### 1.2 非目標（第一版不做）
+- 使用者帳號、雲端同步、多裝置同步
+- 線上編輯資料集（資料以 JSON 檔維護）
+- 語音辨識、手寫輸入
+
+---
+
+## 2. 技術選型
+
+| 項目 | 選擇 | 理由 |
+|---|---|---|
+| 框架 | Vue 3（Composition API + `<script setup>`） | 需求指定 |
+| 建置工具 | Vite | Vue 官方推薦，支援 `import.meta.glob` 載入 `data/` |
+| 語言 | TypeScript | 資料格式、SRS 狀態型別化，減少錯誤 |
+| 狀態管理 | Pinia | 管理資料集、學習階段、進度 |
+| 路由 | Vue Router（hash mode） | GitHub Pages 靜態部署不需伺服器 rewrite |
+| 樣式 | 原生 CSS + CSS 變數（或 UnoCSS / Tailwind，待定） | 支援深色模式與手機版 |
+| 測試 | Vitest（單元）＋ Playwright（E2E，選配） | SRS、洗牌、挖空邏輯需單元測試 |
+| 資料驗證 | 自寫 schema 檢查腳本（或 zod） | 建置前檢查 JSON 格式與 id 重複 |
+| 部署 | GitHub Actions → GitHub Pages | 與 repo 整合 |
+
+---
+
+## 3. 專案結構
+
+```
+Japanese-learning-app/
+├─ data/                         # 所有資料集（JSON）
+│  ├─ vocabulary/
+│  │  ├─ n3-business.json
+│  │  └─ n4-basic.json
+│  └─ grammar/
+│     └─ n3-grammar-01.json
+├─ scripts/
+│  └─ validate-data.ts           # 驗證 JSON 格式、id 唯一性
+├─ src/
+│  ├─ main.ts
+│  ├─ App.vue
+│  ├─ router/index.ts
+│  ├─ types/                     # Dataset、Card、Progress 型別
+│  ├─ data/loader.ts             # import.meta.glob 載入 data/
+│  ├─ stores/
+│  │  ├─ datasets.ts             # 資料集清單與篩選
+│  │  ├─ progress.ts             # SRS 進度（持久化）
+│  │  └─ session.ts              # 當前學習／測驗階段
+│  ├─ lib/
+│  │  ├─ srs.ts                  # 記憶演算法（純函式）
+│  │  ├─ shuffle.ts              # Fisher–Yates 洗牌
+│  │  ├─ queue.ts                # 建立學習佇列（到期卡＋新卡＋錯題重排）
+│  │  ├─ quizModes.ts            # 各測驗模式的題目／答案產生
+│  │  ├─ grammarMarkup.ts        # 例句標記解析（高亮／挖空）
+│  │  └─ storage.ts              # 儲存層（含版本遷移、匯出匯入）
+│  ├─ components/
+│  │  ├─ Flashcard.vue           # 翻牌卡片
+│  │  ├─ GradeButtons.vue        # 再一次／困難／良好／簡單
+│  │  ├─ SentenceView.vue        # 例句高亮／挖空顯示
+│  │  └─ DatasetFilter.vue
+│  └─ views/
+│     ├─ HomeView.vue            # 資料集選擇＋篩選＋今日到期數
+│     ├─ StudyView.vue           # 翻卡學習（SRS）
+│     ├─ QuizView.vue            # 測驗模式
+│     ├─ BrowseView.vue          # 瀏覽／搜尋整份資料集
+│     ├─ StatsView.vue           # 學習統計
+│     └─ SettingsView.vue        # 設定、匯出／匯入、重置
+├─ tests/
+├─ index.html
+├─ vite.config.ts
+└─ package.json
+```
+
+---
+
+## 4. 資料格式
+
+### 4.1 單字（vocabulary）— 依需求
+
+```json
+{
+  "name": "N3 商業單字",
+  "category": "vocabulary",
+  "level": "N3",
+  "data": [
+    {
+      "id": "n3-biz-001",
+      "japanese": "株式",
+      "hiragana": "かぶしき",
+      "simple_chinese": "股份",
+      "full_explanation": "...."
+    }
+  ]
+}
+```
+
+### 4.2 文法（grammar）— 依需求，**建議擴充例句欄位**
+
+原始格式中例句放在 `full_explanation` 的自由文字裡，程式無法可靠地「高亮文法」或「挖空」。
+（文法常會變形，例如 `うちに` 在例句中可能是 `ないうちに`、`熱いうちに`，單純字串比對不可靠。）
+
+建議新增選填欄位 `examples`，用 `【】` 標記文法部分：
+
+```json
+{
+  "name": "N3 文法 01",
+  "category": "grammar",
+  "level": "N3",
+  "data": [
+    {
+      "id": "n3-gram-001",
+      "japanese": "うちに",
+      "simple_chinese": "在～過程中／趁～",
+      "full_explanation": "表示在某狀態持續期間做某事……",
+      "examples": [
+        {
+          "sentence": "若い【うちに】いろいろな経験をしたほうがいい。",
+          "translation": "趁年輕的時候最好多累積各種經驗。"
+        }
+      ]
+    }
+  ]
+}
+```
+
+- 高亮模式：`【うちに】` → `<mark>うちに</mark>`
+- 挖空模式：`【うちに】` → `＿＿＿＿`，答案為括號內文字
+- 沒有 `examples` 的條目自動略過「例句」相關測驗模式
+
+### 4.3 資料集識別
+- 資料集 ID 由檔案路徑產生（例如 `vocabulary/n3-business`），不需在 JSON 內另外寫。
+- 卡片唯一鍵 = `資料集ID + item.id`，避免不同資料集 id 衝突。
+- `scripts/validate-data.ts` 在 `npm run build` 前執行：檢查必填欄位、`category`／`level` 合法值、同一資料集內 id 不重複、例句 `【】` 成對。
+
+### 4.4 載入方式
+使用 Vite `import.meta.glob('/data/**/*.json', { eager: false })`：
+- 新增 JSON 檔不需維護索引清單，重新建置即可。
+- 依需要 lazy-load，資料量大時不會拖慢首頁。
+
+---
+
+## 5. 測驗模式
+
+以 `QuizMode` 定義每種「題目面 → 答案面」：
+
+### 5.1 單字
+| 模式 ID | 題目 | 答案 |
+|---|---|---|
+| `vocab-kanji-to-zh` | 漢字（`japanese`） | 中文（＋平假名、完整解釋） |
+| `vocab-kana-to-zh` | 平假名（`hiragana`） | 中文（＋漢字、完整解釋） |
+| `vocab-zh-to-jp` | 中文 | 漢字＋平假名（完整解釋可切換顯示） |
+
+使用者設定「日文顯示方式」：漢字／平假名／漢字＋振假名（ruby）。
+
+### 5.2 文法
+| 模式 ID | 題目 | 答案 |
+|---|---|---|
+| `grammar-pattern-to-zh` | 文法（`japanese`） | 中文 |
+| `grammar-sentence-to-zh` | 例句（文法高亮） | 中文（＋例句翻譯） |
+| `grammar-zh-to-pattern` | 中文 | 文法（完整解釋可切換顯示） |
+| `grammar-cloze` | 例句挖空＋例句中文翻譯 | 被挖空的文法（完整內容選填） |
+
+### 5.3 作答方式
+- **翻卡自評**（預設，類 Anki）：看題目 → 翻面 → 自評 再一次／困難／良好／簡單
+- **選擇題**（類 Quizlet Learn）：從同資料集同類型抽 3 個干擾選項
+- **輸入作答**（選配）：適合挖空題；比對時忽略空白、全形半形
+
+---
+
+## 6. 記憶演算法與洗牌
+
+### 6.1 SRS：簡化版 SM-2
+每張卡**每個測驗方向**各自一筆進度（「漢字→中文」會了不代表「中文→日文」會）：
+
+```ts
+interface CardProgress {
+  key: string            // `${datasetId}:${itemId}:${modeId}`
+  state: 'new' | 'learning' | 'review' | 'relearning'
+  ease: number           // 預設 2.5，下限 1.3
+  interval: number       // 天
+  due: number            // timestamp
+  reps: number
+  lapses: number
+  lastReviewed: number
+}
+```
+
+評分規則：
+| 評分 | 效果 |
+|---|---|
+| 再一次 | 進入 relearning，interval 重設，ease −0.2，本次學習中稍後再出現 |
+| 困難 | interval × 1.2，ease −0.15 |
+| 良好 | interval × ease |
+| 簡單 | interval × ease × 1.3，ease +0.15 |
+
+學習中步驟（learning steps）：1 分鐘 → 10 分鐘 → 畢業（1 天）。
+`srs.ts` 寫成純函式 `schedule(progress, grade, now) => progress`，方便單元測試；未來可替換為 FSRS。
+
+### 6.2 學習佇列與洗牌
+1. 取出所有 `due <= now` 的複習卡（依到期時間排序後在小區塊內洗牌）
+2. 加入新卡，數量受「每日新卡上限」限制（預設 20）
+3. 以 Fisher–Yates 洗牌混合新卡與複習卡
+4. 答錯的卡插回佇列後方 3–5 張的位置，而非立即重複
+5. 「自由練習」模式：不受 SRS 限制，整份資料集洗牌練習，可選擇不寫入 SRS 進度
+
+---
+
+## 7. 進度儲存
+
+- 使用 `localStorage`（資料量小）；若進度筆數過大（> 數千筆）改用 IndexedDB（透過 `idb-keyval`）。
+- 儲存內容：
+  - `jla:v1:progress` — 所有 `CardProgress`
+  - `jla:v1:settings` — 每日新卡數、顯示方式、作答方式、深色模式等
+  - `jla:v1:history` — 每日複習次數與正確率（統計用）
+- 含 schema 版本號，升級時執行遷移。
+- 設定頁提供：**匯出 JSON 備份**、**匯入備份**、**重置單一資料集進度**、**全部重置**。
+- 資料集內容更新時：已刪除的 id 進度保留但不顯示；新增的 id 視為新卡。
+
+---
+
+## 8. 頁面與功能
+
+| 頁面 | 功能 |
+|---|---|
+| 首頁 | 依 category／level 篩選資料集；顯示每份資料集的新卡／到期／已學數量；可多選資料集合併學習 |
+| 學習 | 選擇測驗模式 → 翻卡 → 自評；進度條；快捷鍵（空白鍵翻面、1–4 評分） |
+| 測驗 | 選擇題／輸入題；結束後顯示成績與錯題清單 |
+| 瀏覽 | 列表檢視整份資料集，可搜尋、看完整解釋 |
+| 統計 | 每日複習量、正確率、各資料集熟練度分布 |
+| 設定 | 偏好設定、匯出匯入、重置 |
+
+---
+
+## 9. 開發階段（里程碑）
+
+| 階段 | 內容 | 產出 |
+|---|---|---|
+| **M0 專案建置** | Vite + Vue 3 + TS + Pinia + Router + ESLint/Prettier + Vitest；GitHub Actions 部署 | 可部署的空殼 |
+| **M1 資料層** | 型別定義、`import.meta.glob` 載入、篩選、`validate-data` 腳本、範例資料集各一份 | 首頁可列出並篩選資料集 |
+| **M2 翻卡** | Flashcard 元件、單字三種模式、洗牌、自由練習 | 可翻卡練習單字 |
+| **M3 SRS 與儲存** | `srs.ts`、`queue.ts`、`storage.ts`、評分按鈕、每日上限 | 進度可保存，重開瀏覽器仍在 |
+| **M4 文法** | 例句標記解析、高亮與挖空、四種文法模式 | 文法學習完整 |
+| **M5 測驗** | 選擇題、輸入題、成績頁 | Quizlet 式測驗 |
+| **M6 統計與設定** | 統計頁、匯出匯入、重置、深色模式 | 完整設定與備份 |
+| **M7 打磨** | RWD 手機版、鍵盤快捷鍵、TTS 發音（Web Speech API）、PWA 離線（選配） | v1.0 |
+
+---
+
+## 10. 測試策略
+- **單元測試**：`srs.ts`（各評分的 interval／ease 變化）、`shuffle.ts`、`queue.ts`（每日上限、錯題重排）、`grammarMarkup.ts`（高亮／挖空）、`storage.ts`（遷移、匯入格式錯誤）
+- **資料驗證**：CI 中執行 `validate-data`，格式錯誤時建置失敗
+- **E2E（選配）**：選資料集 → 學習 → 評分 → 重新整理後進度仍在
+
+---
+
+## 11. 待釐清問題
+
+確認後更新本文件。
+
+1. 作答方式：翻卡自評、選擇題、輸入作答，要哪些？預設哪一種？
+2. `simple_chinese` 是「簡短中文」還是「簡體中文」？介面要繁體還是簡體？
+3. 文法例句能否改用 `examples` + `【】` 標記的結構化格式？
+4. SRS 進度要「每個測驗方向分開」還是「每張卡共用一筆」？
+5. 是否需要跨資料集混合學習（例如 N3 單字全部一起）？
+6. 沒有漢字的單字（片假名外來語、純平假名詞）`japanese` 欄位怎麼填？
+7. `full_explanation` 是純文字還是允許 Markdown／換行？
+8. 部署目標是 GitHub Pages 嗎？需要手機離線（PWA）嗎？
+9. 需要發音（TTS）嗎？

@@ -31,7 +31,9 @@ const practiceButtons: { grade: Grade; label: string; key: string }[] = [
       :class="button.grade"
       @click="$emit('grade', button.grade)"
     >
-      <span>{{ button.label }} <kbd>{{ button.key }}</kbd></span>
+      <span
+        >{{ button.label }} <kbd>{{ button.key }}</kbd></span
+      >
       <span v-if="intervals" class="interval">{{ intervals[button.grade] }}</span>
     </button>
   </div>

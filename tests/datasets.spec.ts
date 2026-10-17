@@ -25,7 +25,12 @@ const modules: DatasetModules = {
     level: 'N3',
     data: [item('1'), item('2'), item('3')],
   }),
-  '/data/broken.json': async () => ({ name: '壞掉', category: 'vocabulary', level: 'N9', data: [] }),
+  '/data/broken.json': async () => ({
+    name: '壞掉',
+    category: 'vocabulary',
+    level: 'N9',
+    data: [],
+  }),
 }
 
 describe('loader', () => {
@@ -36,7 +41,9 @@ describe('loader', () => {
   it('loads valid datasets sorted by category, level, then name, and reports invalid ones', async () => {
     const { datasets, errors } = await loadDatasets(modules)
     expect(datasets.map((d) => d.id)).toEqual(['grammar/n3', 'vocabulary/n4-a', 'vocabulary/n3-b'])
-    expect(errors).toEqual([{ path: '/data/broken.json', errors: [expect.stringContaining('level')] }])
+    expect(errors).toEqual([
+      { path: '/data/broken.json', errors: [expect.stringContaining('level')] },
+    ])
   })
 
   it('reports files that fail to load', async () => {

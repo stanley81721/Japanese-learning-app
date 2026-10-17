@@ -30,7 +30,7 @@ describe('study session store', () => {
     const session = useStudySessionStore()
     expect(session.status).toBe('setup')
 
-    session.start(deck, 'practice')
+    session.start(deck, { mode: 'practice' })
     session.answer('good') // 還沒翻面，無效
     expect(session.index).toBe(0)
 
@@ -45,13 +45,13 @@ describe('study session store', () => {
     expect(useProgressStore().totalCards).toBe(0)
 
     session.retryUnknown()
-    expect(session.queue.map((c) => c.itemId)).toEqual(['2'])
+    expect(session.queue.map((e) => e.card.itemId)).toEqual(['2'])
   })
 
   it('srs mode: saves progress and requeues cards still being learned', () => {
     const session = useStudySessionStore()
     const progress = useProgressStore()
-    session.start([...deck], 'srs')
+    session.start([...deck], { mode: 'srs' })
 
     session.flip()
     session.answer('again') // 學習中 → 插回佇列
@@ -73,9 +73,9 @@ describe('study session store', () => {
 
   it('previews intervals only in srs mode', () => {
     const session = useStudySessionStore()
-    session.start([...deck], 'srs')
+    session.start([...deck], { mode: 'srs' })
     expect(session.intervalPreview).toMatchObject({ good: '10 分', easy: '4 天' })
-    session.start([...deck], 'practice')
+    session.start([...deck], { mode: 'practice' })
     expect(session.intervalPreview).toBeNull()
   })
 
@@ -99,10 +99,15 @@ describe('datasets selection persistence', () => {
 describe('StudyView', () => {
   let wrapper: VueWrapper
 
-  async function mountStudy(selected: string[]) {
+  /** 預設只用翻卡自評，讓流程可預測；作答方式另有測試 */
+  async function mountStudy(selected: string[], settings: object = {}, path = '/study') {
     localStorage.setItem('jla:v1:selected-datasets', JSON.stringify(selected))
+    localStorage.setItem(
+      'jla:v1:settings',
+      JSON.stringify({ answerMethods: ['flip'], ...settings }),
+    )
     const router = createRouter({ history: createMemoryHistory(), routes })
-    router.push('/study')
+    router.push(path)
     await router.isReady()
     const pinia = createPinia()
     wrapper = mount(App, { global: { plugins: [pinia, router] }, attachTo: document.body })
@@ -127,8 +132,7 @@ describe('StudyView', () => {
 
   it('studies new cards with SRS until they graduate, then has nothing left today', async () => {
     // 上限 6：學完後其他測驗方向不會再被當成今天的新卡
-    localStorage.setItem('jla:v1:settings', JSON.stringify({ newCardsPerDay: 6 }))
-    await mountStudy(['vocabulary/n4-daily-sample'])
+    await mountStudy(['vocabulary/n4-daily-sample'], { newCardsPerDay: 6 })
     expect(button('開始學習').text()).toContain('6')
 
     await button('開始學習').trigger('click')
@@ -152,8 +156,7 @@ describe('StudyView', () => {
   })
 
   it('respects the daily new card limit', async () => {
-    localStorage.setItem('jla:v1:settings', JSON.stringify({ newCardsPerDay: 2 }))
-    await mountStudy(['vocabulary/n4-daily-sample'])
+    await mountStudy(['vocabulary/n4-daily-sample'], { newCardsPerDay: 2 })
     expect(button('開始學習').text()).toContain('2')
   })
 
@@ -169,7 +172,7 @@ describe('StudyView', () => {
     expect(wrapper.find('h1').text()).toBe('練習完成')
     expect(wrapper.find('.stat-num.good').text()).toBe('4')
     expect(wrapper.find('.stat-num.again').text()).toBe('2')
-    expect(button('再練一次忘記的').text()).toContain('2')
+    expect(button('再練一次答錯的').text()).toContain('2')
   })
 
   it('disables starting when no mode is enabled for the selected category', async () => {

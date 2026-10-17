@@ -77,7 +77,9 @@ function stepThrough(
     case 'good':
       return p.step + 1 >= steps.length ? graduate(graduateInterval) : stayAt(p.step + 1)
     case 'easy':
-      return graduate(Math.max(graduateInterval, p.state === 'relearning' ? p.interval + 1 : EASY_INTERVAL))
+      return graduate(
+        Math.max(graduateInterval, p.state === 'relearning' ? p.interval + 1 : EASY_INTERVAL),
+      )
   }
 }
 
@@ -148,6 +150,7 @@ export function formatInterval(ms: number): string {
 
 export function previewIntervals(progress: CardProgress, now: number): Record<Grade, string> {
   const result = {} as Record<Grade, string>
-  for (const grade of GRADES) result[grade] = formatInterval(schedule(progress, grade, now).due - now)
+  for (const grade of GRADES)
+    result[grade] = formatInterval(schedule(progress, grade, now).due - now)
   return result
 }

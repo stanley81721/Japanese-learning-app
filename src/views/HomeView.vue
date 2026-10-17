@@ -63,8 +63,11 @@ onMounted(() => store.ensureLoaded())
         <strong>有 {{ loadErrors.length }} 個資料集格式錯誤，已略過：</strong>
         <ul>
           <li v-for="error in loadErrors" :key="error.path">
-            <code>{{ error.path }}</code>：{{ error.errors[0] }}
-            <span v-if="error.errors.length > 1">（另有 {{ error.errors.length - 1 }} 個錯誤）</span>
+            <code>{{ error.path }}</code
+            >：{{ error.errors[0] }}
+            <span v-if="error.errors.length > 1"
+              >（另有 {{ error.errors.length - 1 }} 個錯誤）</span
+            >
           </li>
         </ul>
       </div>

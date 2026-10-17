@@ -10,7 +10,8 @@ export function parseMarkedSentence(sentence: string): SentenceSegment[] {
   const pattern = /【([^【】]*)】/g
   let last = 0
   for (const match of sentence.matchAll(pattern)) {
-    if (match.index > last) segments.push({ text: sentence.slice(last, match.index), marked: false })
+    if (match.index > last)
+      segments.push({ text: sentence.slice(last, match.index), marked: false })
     segments.push({ text: match[1]!, marked: true })
     last = match.index + match[0].length
   }

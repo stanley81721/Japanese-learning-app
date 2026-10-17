@@ -1,130 +1,216 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
+import {
+  assignAnswerMethod,
+  isCorrectInput,
+  type AnswerMethod,
+  type SessionEntry,
+} from '@/lib/answerMethods'
 import { QUIZ_MODE_IDS, type QuizModeId, type StudyCard } from '@/lib/quizModes'
 import { requeuePosition } from '@/lib/queue'
 import { isInLearning, previewIntervals, type Grade } from '@/lib/srs'
 import { loadJSON, saveJSON } from '@/lib/storage'
 import { shuffle } from '@/lib/shuffle'
 import { useProgressStore } from '@/stores/progress'
+import type { Dataset } from '@/types/dataset'
 
 export type SessionStatus = 'setup' | 'active' | 'finished'
-/** srs：依記憶演算法排程並記錄進度；practice：自由練習，不記錄 */
+/** srs：依記憶演算法排程並記錄進度；practice：自由練習或測驗，不記錄 */
 export type SessionMode = 'srs' | 'practice'
 
-export const useStudySessionStore = defineStore('studySession', () => {
-  const progress = useProgressStore()
+/** 選擇題或輸入題作答後的結果；翻面並等使用者按「繼續」才正式評分 */
+export interface SessionResponse {
+  correct: boolean
+  /** 選擇題選了第幾個 */
+  choice?: number
+  /** 輸入題輸入的內容 */
+  input?: string
+  /** 輸入題被判錯，使用者改判為正確 */
+  overridden?: boolean
+}
 
-  const mode = ref<SessionMode>('srs')
-  /** 學習佇列；SRS 模式中答錯的卡會被插回後方 */
-  const queue = ref<StudyCard[]>([])
-  const index = ref(0)
-  const flipped = ref(false)
-  /** 每張卡第一次的評分（用於結果統計） */
-  const firstGrades = ref<Record<string, Grade>>({})
-  const reviewCount = ref(0)
+export interface StartOptions {
+  mode: SessionMode
+  /** 啟用的作答方式 */
+  methods?: readonly AnswerMethod[]
+  /** 選擇題干擾選項的來源 */
+  pool?: readonly Dataset[]
+}
 
-  const savedModes = loadJSON<QuizModeId[]>('study-modes', [...QUIZ_MODE_IDS])
-  const enabledModes = ref<QuizModeId[]>(savedModes.filter((id) => QUIZ_MODE_IDS.includes(id)))
+/** 學習與測驗各用一個獨立的 store，互不干擾 */
+function defineSessionStore(id: string, modesKey: string) {
+  return defineStore(id, () => {
+    const progress = useProgressStore()
 
-  const status = computed<SessionStatus>(() => {
-    if (queue.value.length === 0) return 'setup'
-    return index.value >= queue.value.length ? 'finished' : 'active'
-  })
+    const mode = ref<SessionMode>('srs')
+    const methods = ref<readonly AnswerMethod[]>(['flip'])
+    let pool: readonly Dataset[] = []
 
-  const current = computed<StudyCard | undefined>(() => queue.value[index.value])
-  const remaining = computed(() => queue.value.length - index.value)
+    /** 學習佇列；SRS 模式中答錯的卡會被插回後方 */
+    const queue = ref<SessionEntry[]>([])
+    const index = ref(0)
+    const flipped = ref(false)
+    const response = ref<SessionResponse | null>(null)
+    /** 每張卡第一次的評分（用於結果統計） */
+    const firstGrades = ref<Record<string, Grade>>({})
+    const reviewCount = ref(0)
 
-  const uniqueCards = computed(() => {
-    const seen = new Map<string, StudyCard>()
-    for (const card of queue.value) if (!seen.has(card.key)) seen.set(card.key, card)
-    return [...seen.values()]
-  })
-  const studiedCount = computed(() => Object.keys(firstGrades.value).length)
-  const unknownCards = computed(() =>
-    uniqueCards.value.filter((c) => firstGrades.value[c.key] === 'again'),
-  )
-  const knownCount = computed(() => studiedCount.value - unknownCards.value.length)
+    const savedModes = loadJSON<QuizModeId[]>(modesKey, [...QUIZ_MODE_IDS])
+    const enabledModes = ref<QuizModeId[]>(savedModes.filter((m) => QUIZ_MODE_IDS.includes(m)))
 
-  /** SRS 模式下各評分按鈕對應的下次間隔 */
-  const intervalPreview = computed<Record<Grade, string> | null>(() => {
-    const card = current.value
-    if (mode.value !== 'srs' || !card) return null
-    const now = Date.now()
-    return previewIntervals(progress.getOrNew(card.key, now), now)
-  })
+    const status = computed<SessionStatus>(() => {
+      if (queue.value.length === 0) return 'setup'
+      return index.value >= queue.value.length ? 'finished' : 'active'
+    })
 
-  function toggleMode(id: QuizModeId): void {
-    enabledModes.value = enabledModes.value.includes(id)
-      ? enabledModes.value.filter((m) => m !== id)
-      : [...enabledModes.value, id]
-    saveJSON('study-modes', enabledModes.value)
-  }
+    const currentEntry = computed<SessionEntry | undefined>(() => queue.value[index.value])
+    const current = computed<StudyCard | undefined>(() => currentEntry.value?.card)
+    const remaining = computed(() => queue.value.length - index.value)
 
-  function start(deck: StudyCard[], sessionMode: SessionMode): void {
-    mode.value = sessionMode
-    queue.value = deck
-    index.value = 0
-    flipped.value = false
-    firstGrades.value = {}
-    reviewCount.value = 0
-  }
+    const uniqueCards = computed(() => {
+      const seen = new Map<string, StudyCard>()
+      for (const { card } of queue.value) if (!seen.has(card.key)) seen.set(card.key, card)
+      return [...seen.values()]
+    })
+    const studiedCount = computed(() => Object.keys(firstGrades.value).length)
+    const unknownCards = computed(() =>
+      uniqueCards.value.filter((c) => firstGrades.value[c.key] === 'again'),
+    )
+    const knownCount = computed(() => studiedCount.value - unknownCards.value.length)
 
-  function flip(): void {
-    if (status.value === 'active') flipped.value = !flipped.value
-  }
+    /** SRS 模式翻卡自評時，各評分按鈕對應的下次間隔 */
+    const intervalPreview = computed<Record<Grade, string> | null>(() => {
+      const card = current.value
+      if (mode.value !== 'srs' || !card) return null
+      const now = Date.now()
+      return previewIntervals(progress.getOrNew(card.key, now), now)
+    })
 
-  /** 翻面後才能作答 */
-  function answer(grade: Grade): void {
-    const card = current.value
-    if (!card || !flipped.value) return
-
-    if (!(card.key in firstGrades.value)) {
-      firstGrades.value = { ...firstGrades.value, [card.key]: grade }
+    function toggleMode(modeId: QuizModeId): void {
+      enabledModes.value = enabledModes.value.includes(modeId)
+        ? enabledModes.value.filter((m) => m !== modeId)
+        : [...enabledModes.value, modeId]
+      saveJSON(modesKey, enabledModes.value)
     }
-    reviewCount.value++
 
-    if (mode.value === 'srs') {
-      const updated = progress.review(card.key, grade, Date.now())
-      if (isInLearning(updated)) {
-        const next = [...queue.value]
-        next.splice(requeuePosition(index.value, next.length), 0, card)
-        queue.value = next
+    function entryFor(card: StudyCard): SessionEntry {
+      return assignAnswerMethod(card, methods.value, pool)
+    }
+
+    function start(deck: StudyCard[], options: StartOptions): void {
+      mode.value = options.mode
+      methods.value = options.methods?.length ? options.methods : ['flip']
+      pool = options.pool ?? []
+      queue.value = deck.map(entryFor)
+      index.value = 0
+      flipped.value = false
+      response.value = null
+      firstGrades.value = {}
+      reviewCount.value = 0
+    }
+
+    /** 只有翻卡自評可以直接翻面；其他方式作答後自動翻面 */
+    function flip(): void {
+      if (status.value === 'active' && currentEntry.value?.method === 'flip') {
+        flipped.value = !flipped.value
       }
     }
 
-    index.value++
-    flipped.value = false
-  }
+    function submitChoice(choice: number): void {
+      const entry = currentEntry.value
+      if (!entry?.choices || response.value) return
+      response.value = { choice, correct: entry.choices[choice] === entry.card.back.text }
+      flipped.value = true
+    }
 
-  function retryUnknown(): void {
-    start(shuffle(unknownCards.value), 'practice')
-  }
+    function submitInput(input: string): void {
+      const entry = currentEntry.value
+      if (entry?.method !== 'input' || response.value || !input.trim()) return
+      response.value = { input, correct: isCorrectInput(input, entry.card.answers ?? []) }
+      flipped.value = true
+    }
 
-  function reset(): void {
-    start([], mode.value)
-  }
+    /** 輸入題被判錯時，使用者可以改判為正確（例如同義寫法） */
+    function overrideCorrect(): void {
+      if (response.value && !response.value.correct && response.value.input !== undefined) {
+        response.value = { ...response.value, correct: true, overridden: true }
+      }
+    }
 
-  return {
-    mode,
-    queue,
-    index,
-    flipped,
-    firstGrades,
-    reviewCount,
-    enabledModes,
-    status,
-    current,
-    remaining,
-    studiedCount,
-    knownCount,
-    unknownCards,
-    intervalPreview,
-    toggleMode,
-    start,
-    flip,
-    answer,
-    retryUnknown,
-    reset,
-  }
-})
+    /** 選擇題、輸入題作答後按「繼續」：答對＝良好，答錯＝再一次 */
+    function proceed(): void {
+      if (response.value) answer(response.value.correct ? 'good' : 'again')
+    }
+
+    /** 翻面後才能評分 */
+    function answer(grade: Grade): void {
+      const card = current.value
+      if (!card || !flipped.value) return
+
+      if (!(card.key in firstGrades.value)) {
+        firstGrades.value = { ...firstGrades.value, [card.key]: grade }
+      }
+      reviewCount.value++
+
+      if (mode.value === 'srs') {
+        const updated = progress.review(card.key, grade, Date.now())
+        if (isInLearning(updated)) {
+          // 再出現時重新隨機作答方式
+          const next = [...queue.value]
+          next.splice(requeuePosition(index.value, next.length), 0, entryFor(card))
+          queue.value = next
+        }
+      }
+
+      index.value++
+      flipped.value = false
+      response.value = null
+    }
+
+    function retryUnknown(): void {
+      start(shuffle(unknownCards.value), { mode: 'practice', methods: methods.value, pool })
+    }
+
+    function reset(): void {
+      queue.value = []
+      index.value = 0
+      flipped.value = false
+      response.value = null
+    }
+
+    return {
+      mode,
+      queue,
+      index,
+      flipped,
+      response,
+      firstGrades,
+      reviewCount,
+      enabledModes,
+      status,
+      currentEntry,
+      current,
+      remaining,
+      studiedCount,
+      knownCount,
+      unknownCards,
+      intervalPreview,
+      toggleMode,
+      start,
+      flip,
+      submitChoice,
+      submitInput,
+      overrideCorrect,
+      proceed,
+      answer,
+      retryUnknown,
+      reset,
+    }
+  })
+}
+
+export const useStudySessionStore = defineSessionStore('studySession', 'study-modes')
+export const useQuizSessionStore = defineSessionStore('quizSession', 'quiz-modes')
+
+export type SessionStore = ReturnType<typeof useStudySessionStore>

@@ -3,8 +3,7 @@
 import { CATEGORIES, LEVELS, type DatasetFile } from '../types/dataset'
 
 export type ValidationResult =
-  | { ok: true; dataset: DatasetFile; errors: [] }
-  | { ok: false; errors: string[] }
+  { ok: true; dataset: DatasetFile; errors: [] } | { ok: false; errors: string[] }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)

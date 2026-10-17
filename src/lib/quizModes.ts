@@ -49,6 +49,8 @@ export interface StudyCard {
   modeId: QuizModeId
   front: CardFace
   back: CardFace
+  /** 答案是日文時，輸入作答可接受的寫法（漢字、讀音） */
+  answers?: string[]
 }
 
 const ja = (text: string): CardText => ({ text, lang: 'ja' })
@@ -68,7 +70,7 @@ function fullJapanese(item: VocabularyItem): string {
 function faces(
   modeId: QuizModeId,
   item: VocabularyItem | GrammarItem,
-): Pick<StudyCard, 'front' | 'back'> {
+): Pick<StudyCard, 'front' | 'back' | 'answers'> {
   const explanation = item.full_explanation
   switch (modeId) {
     case 'vocab-kanji-to-zh': {
@@ -91,6 +93,7 @@ function faces(
       return {
         front: zh(v.simple_chinese),
         back: { ...ja(v.japanese), sub: reading ? ja(reading) : undefined, explanation },
+        answers: reading ? [v.japanese, reading] : [v.japanese],
       }
     }
     case 'grammar-pattern-to-zh':
@@ -102,6 +105,7 @@ function faces(
       return {
         front: zh(item.simple_chinese),
         back: { ...ja(item.japanese), explanation },
+        answers: [item.japanese],
       }
   }
 }

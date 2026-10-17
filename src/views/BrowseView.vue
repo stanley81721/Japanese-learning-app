@@ -87,14 +87,18 @@ onMounted(() => store.ensureLoaded())
       <section v-for="{ dataset, items } in sections" :key="dataset.id" class="dataset-section">
         <h2>
           {{ dataset.name }}
-          <span class="muted small">{{ CATEGORY_LABELS[dataset.category] }}・{{ dataset.level }}</span>
+          <span class="muted small"
+            >{{ CATEGORY_LABELS[dataset.category] }}・{{ dataset.level }}</span
+          >
         </h2>
         <ul class="item-list">
           <li v-for="item in items" :key="item.id" class="item">
             <button
               type="button"
               class="item-row"
-              :aria-expanded="hasDetails(item) ? expanded.has(rowKey(dataset.id, item.id)) : undefined"
+              :aria-expanded="
+                hasDetails(item) ? expanded.has(rowKey(dataset.id, item.id)) : undefined
+              "
               :disabled="!hasDetails(item)"
               @click="toggle(rowKey(dataset.id, item.id))"
             >

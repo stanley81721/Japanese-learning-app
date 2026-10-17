@@ -2,10 +2,17 @@
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import type { CardText, StudyCard } from '@/lib/quizModes'
 
-defineProps<{
-  card: StudyCard
-  flipped: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    card: StudyCard
+    flipped: boolean
+    /** 正面下方的提示文字 */
+    hint?: string
+    /** 點擊卡片是否會翻面（選擇題、輸入題不行） */
+    clickable?: boolean
+  }>(),
+  { hint: '點擊卡片或按空白鍵翻面', clickable: true },
+)
 
 const emit = defineEmits<{ flip: [] }>()
 
@@ -13,19 +20,19 @@ const langOf = (t: CardText) => (t.lang === 'ja' ? 'ja' : 'zh-Hant')
 
 // 點擊卡片翻面；解釋中的連結照常開啟。鍵盤操作由 StudyView 的按鈕與快捷鍵負責。
 function onClick(event: MouseEvent) {
-  if ((event.target as HTMLElement).closest('a')) return
+  if (!props.clickable || (event.target as HTMLElement).closest('a')) return
   emit('flip')
 }
 </script>
 
 <template>
-  <div class="flashcard" :class="{ flipped }" @click="onClick">
+  <div class="flashcard" :class="{ flipped, clickable }" @click="onClick">
     <div class="card-inner">
       <div class="face front" :aria-hidden="flipped" :inert="flipped || undefined">
         <div class="main" :class="card.front.lang" :lang="langOf(card.front)">
           {{ card.front.text }}
         </div>
-        <div class="hint">點擊卡片或按空白鍵翻面</div>
+        <div class="hint">{{ hint }}</div>
       </div>
 
       <div class="face back" :aria-hidden="!flipped" :inert="!flipped || undefined">
@@ -48,11 +55,14 @@ function onClick(event: MouseEvent) {
 
 <style scoped>
 .flashcard {
-  height: clamp(280px, 52vh, 440px);
+  height: clamp(240px, 46vh, 420px);
   text-align: center;
-  cursor: pointer;
   perspective: 1200px;
   user-select: none;
+}
+
+.flashcard.clickable {
+  cursor: pointer;
 }
 
 .card-inner {

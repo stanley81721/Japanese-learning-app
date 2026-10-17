@@ -81,9 +81,11 @@ describe('countDataset', () => {
       review('vocabulary/t:a:vocab-zh-to-jp', NOW),
       review('vocabulary/t:b:vocab-zh-to-jp', NOW + 9 * DAY),
     ])
-    expect(
-      countDataset(dataset, ['vocab-kanji-to-zh', 'vocab-zh-to-jp'], progress, NOW),
-    ).toEqual({ due: 2, seen: 2, unseen: 2 })
+    expect(countDataset(dataset, ['vocab-kanji-to-zh', 'vocab-zh-to-jp'], progress, NOW)).toEqual({
+      due: 2,
+      seen: 2,
+      unseen: 2,
+    })
     expect(countDataset(dataset, ['vocab-kanji-to-zh'], progress, NOW)).toEqual({
       due: 1,
       seen: 1,

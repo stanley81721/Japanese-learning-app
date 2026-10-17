@@ -1,56 +1,32 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 
-import FlashCard from '@/components/FlashCard.vue'
-import GradeButtons from '@/components/GradeButtons.vue'
+import AnswerMethodPicker from '@/components/AnswerMethodPicker.vue'
+import ModePicker from '@/components/ModePicker.vue'
+import SessionPanel from '@/components/SessionPanel.vue'
 import { buildPracticeDeck } from '@/lib/deck'
 import { buildStudyQueue, countDataset } from '@/lib/queue'
-import { QUIZ_MODES, getQuizMode } from '@/lib/quizModes'
-import type { Grade } from '@/lib/srs'
+import { getQuizMode } from '@/lib/quizModes'
 import { useDatasetsStore } from '@/stores/datasets'
 import { useProgressStore } from '@/stores/progress'
 import { useSettingsStore } from '@/stores/settings'
 import { useStudySessionStore } from '@/stores/studySession'
-import { CATEGORY_LABELS, type Category } from '@/types/dataset'
 
 const datasetsStore = useDatasetsStore()
 const progress = useProgressStore()
 const settings = useSettingsStore()
 const session = useStudySessionStore()
 const { status: loadStatus, selectedDatasets, selectedItemCount } = storeToRefs(datasetsStore)
-const { newCardsPerDay } = storeToRefs(settings)
-const {
-  mode,
-  status,
-  current,
-  flipped,
-  index,
-  queue,
-  remaining,
-  enabledModes,
-  studiedCount,
-  reviewCount,
-  knownCount,
-  unknownCards,
-  intervalPreview,
-} = storeToRefs(session)
+const { newCardsPerDay, answerMethods } = storeToRefs(settings)
+const { mode, status, enabledModes, studiedCount, reviewCount, knownCount, unknownCards } =
+  storeToRefs(session)
 
 // 回到設定畫面時更新時間，讓到期數保持正確
 const now = ref(Date.now())
 watch(status, (s) => {
   if (s === 'setup') now.value = Date.now()
-})
-
-/** 已選資料集涉及的分類，以及各分類可選的測驗方向 */
-const modeGroups = computed(() => {
-  const categories = new Set<Category>(selectedDatasets.value.map((d) => d.category))
-  return [...categories].map((category) => ({
-    category,
-    label: CATEGORY_LABELS[category],
-    modes: QUIZ_MODES.filter((m) => m.category === category),
-  }))
 })
 
 const newToday = computed(() => progress.statsFor(now.value).newCards)
@@ -83,56 +59,29 @@ const practiceDeckSize = computed(() =>
     .reduce((sum, d) => sum + d.data.length, 0),
 )
 
-const progressPercent = computed(() =>
-  queue.value.length ? Math.round((index.value / queue.value.length) * 100) : 0,
-)
-
 function startStudy() {
   now.value = Date.now()
-  session.start(buildQueue(), 'srs')
+  session.start(buildQueue(), {
+    mode: 'srs',
+    methods: answerMethods.value,
+    pool: selectedDatasets.value,
+  })
 }
 
 function startPractice() {
-  session.start(buildPracticeDeck(selectedDatasets.value, enabledModes.value), 'practice')
+  session.start(buildPracticeDeck(selectedDatasets.value, enabledModes.value), {
+    mode: 'practice',
+    methods: answerMethods.value,
+    pool: selectedDatasets.value,
+  })
 }
 
-function onNewLimitInput(event: Event) {
+function onNewLimitChange(event: Event) {
   const value = Number((event.target as HTMLInputElement).value)
   if (Number.isInteger(value) && value >= 0 && value <= 999) newCardsPerDay.value = value
 }
 
-const SRS_KEYS: Record<string, Grade> = { '1': 'again', '2': 'hard', '3': 'good', '4': 'easy' }
-const PRACTICE_KEYS: Record<string, Grade> = {
-  '1': 'again',
-  ArrowLeft: 'again',
-  '2': 'good',
-  ArrowRight: 'good',
-}
-
-function onKeydown(event: KeyboardEvent) {
-  if (status.value !== 'active' || event.ctrlKey || event.metaKey || event.altKey) return
-  // 事件可能直接發在 window 上（不是 Element）
-  const target = event.target instanceof Element ? event.target : null
-  if (target?.closest('input, textarea, select')) return
-
-  if (event.key === ' ' || event.key === 'Enter') {
-    // 焦點在按鈕上時讓按鈕自己處理，避免觸發兩次
-    if (target?.closest('button')) return
-    event.preventDefault()
-    session.flip()
-    return
-  }
-
-  const grade = (mode.value === 'srs' ? SRS_KEYS : PRACTICE_KEYS)[event.key]
-  if (flipped.value && grade) session.answer(grade)
-}
-
-onMounted(() => {
-  datasetsStore.ensureLoaded()
-  window.addEventListener('keydown', onKeydown)
-})
-
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onMounted(() => datasetsStore.ensureLoaded())
 </script>
 
 <template>
@@ -166,19 +115,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div class="panel">
-          <h2>測驗方向</h2>
-          <p class="muted small">可複選；每個方向的記憶進度分開計算。</p>
-          <fieldset v-for="group in modeGroups" :key="group.category" class="mode-group">
-            <legend>{{ group.label }}</legend>
-            <label v-for="m in group.modes" :key="m.id" class="mode-option">
-              <input
-                type="checkbox"
-                :checked="enabledModes.includes(m.id)"
-                @change="session.toggleMode(m.id)"
-              />
-              {{ m.label }}
-            </label>
-          </fieldset>
+          <h2>測驗方式</h2>
+          <p class="muted small">
+            可複選；每題會從勾選的方向與作答方式中隨機挑選。每個方向的記憶進度分開計算。
+          </p>
+          <ModePicker
+            :datasets="selectedDatasets"
+            :enabled="enabledModes"
+            @toggle="session.toggleMode"
+          />
+          <AnswerMethodPicker />
         </div>
 
         <div class="panel">
@@ -200,7 +146,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               min="0"
               max="999"
               :value="newCardsPerDay"
-              @change="onNewLimitInput"
+              @change="onNewLimitChange"
             />
             <span class="muted small">（今天已學 {{ newToday }} 張）</span>
           </label>
@@ -233,48 +179,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     </template>
 
     <!-- 學習中 -->
-    <template v-else-if="status === 'active' && current">
-      <div class="session-header">
-        <span class="muted small">
-          {{ mode === 'srs' ? '記憶複習' : '自由練習' }}・{{ current.datasetName }}・{{
-            getQuizMode(current.modeId).label
-          }}
-        </span>
-        <span class="counter">剩 {{ remaining }} 張</span>
-      </div>
-      <div
-        class="progress"
-        role="progressbar"
-        :aria-valuenow="index"
-        aria-valuemin="0"
-        :aria-valuemax="queue.length"
-      >
-        <div class="progress-bar" :style="{ width: `${progressPercent}%` }" />
-      </div>
-
-      <FlashCard
-        :key="`${current.key}#${index}`"
-        :card="current"
-        :flipped="flipped"
-        @flip="session.flip()"
-      />
-
-      <div class="answer-row">
-        <button v-if="!flipped" type="button" class="btn btn-primary wide" @click="session.flip()">
-          翻面 <kbd>Space</kbd>
-        </button>
-        <GradeButtons
-          v-else
-          class="wide"
-          :intervals="intervalPreview"
-          @grade="session.answer"
-        />
-      </div>
-
-      <div class="end-row">
-        <button type="button" class="small-link" @click="session.reset()">結束</button>
-      </div>
-    </template>
+    <SessionPanel
+      v-else-if="status === 'active'"
+      :session="session"
+      :label="mode === 'srs' ? '記憶複習' : '自由練習'"
+    />
 
     <!-- 結果 -->
     <template v-else-if="status === 'finished'">
@@ -286,15 +195,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
         <div>
           <div class="stat-num good">{{ knownCount }}</div>
-          <div class="muted small">第一次就記得</div>
+          <div class="muted small">第一次就答對</div>
         </div>
         <div>
           <div class="stat-num again">{{ unknownCards.length }}</div>
-          <div class="muted small">忘記</div>
+          <div class="muted small">答錯</div>
         </div>
       </div>
       <p v-if="mode === 'srs'" class="muted small center">
-        共評分 {{ reviewCount }} 次，進度已儲存在這個瀏覽器中。
+        共作答 {{ reviewCount }} 次，進度已儲存在這個瀏覽器中。
       </p>
       <div class="start-row">
         <button type="button" class="btn" @click="session.reset()">回到設定</button>
@@ -304,7 +213,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           class="btn btn-primary"
           @click="session.retryUnknown()"
         >
-          再練一次忘記的（{{ unknownCards.length }}）
+          再練一次答錯的（{{ unknownCards.length }}）
         </button>
       </div>
     </template>
@@ -319,11 +228,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 h1 {
   margin-top: 0;
-}
-
-h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
 }
 
 .muted {
@@ -347,54 +251,10 @@ h2 {
   font-size: 0.875rem;
 }
 
-.panel {
-  margin-bottom: 1rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-}
-
-.panel p {
-  margin: 0 0 0.5rem;
-}
-
 .small-link {
-  padding: 0;
-  border: none;
-  background: none;
   color: var(--color-primary);
-  font: inherit;
   font-size: 0.875rem;
   text-decoration: none;
-  cursor: pointer;
-}
-
-.mode-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-  margin: 0.5rem 0 0;
-  padding: 0.5rem 0.75rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
-.mode-group legend {
-  padding: 0 0.25rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.mode-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  cursor: pointer;
-}
-
-.mode-option input {
-  accent-color: var(--color-primary);
 }
 
 .today {
@@ -435,49 +295,6 @@ h2 {
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
-}
-
-.session-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.375rem;
-}
-
-.counter {
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.progress {
-  height: 6px;
-  margin-bottom: 1rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--color-hover);
-}
-
-.progress-bar {
-  height: 100%;
-  background: var(--color-primary);
-  transition: width 0.2s ease;
-}
-
-.answer-row {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.wide {
-  flex: 1;
-}
-
-.end-row {
-  margin-top: 1rem;
-  text-align: center;
 }
 
 .summary {

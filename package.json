@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "npm run validate-data && run-p type-check \"build-only {@}\" --",
+    "validate-data": "tsx scripts/validate-data.ts",
     "build-only": "vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --build",
@@ -33,6 +34,7 @@
     "jsdom": "^25.0.1",
     "npm-run-all2": "^7.0.2",
     "prettier": "^3.4.2",
+    "tsx": "^4.23.15",
     "typescript": "~5.8.3",
     "vite": "^6.0.5",
     "vitest": "^2.1.8",

@@ -160,9 +160,10 @@ Japanese-learning-app/
 - `scripts/validate-data.ts` 在 `npm run build` 前執行：檢查必填欄位、`category`／`level` 合法值、同一資料集內 id 不重複、例句 `【】` 成對。
 
 ### 4.4 載入方式
-使用 Vite `import.meta.glob('/data/**/*.json', { eager: false })`：
+使用 Vite `import.meta.glob('/data/**/*.json', { import: 'default' })`：
 - 新增 JSON 檔不需維護索引清單，重新建置即可。
-- 依需要 lazy-load，資料量大時不會拖慢首頁。
+- 每個 JSON 檔打包成獨立 chunk，不塞進主程式；首頁開啟時並行載入全部資料集（首頁需要顯示每份的筆數）。
+- 載入時用與 `validate-data` 相同的驗證函式（`src/lib/validateDataset.ts`）；格式錯誤的檔案會被略過，並在首頁顯示錯誤。
 
 ---
 

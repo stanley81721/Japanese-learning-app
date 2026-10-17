@@ -1,0 +1,59 @@
+{
+  "name": "N3 商業單字（範例）",
+  "category": "vocabulary",
+  "level": "N3",
+  "data": [
+    {
+      "id": "n3-biz-001",
+      "japanese": "株式",
+      "hiragana": "かぶしき",
+      "simple_chinese": "股份",
+      "full_explanation": "**股份、股票**\n\n- 株式会社（かぶしきがいしゃ）：股份有限公司\n- 株式市場（かぶしきしじょう）：股票市場"
+    },
+    {
+      "id": "n3-biz-002",
+      "japanese": "景気",
+      "hiragana": "けいき",
+      "simple_chinese": "景氣",
+      "full_explanation": "經濟狀況。常見搭配：**景気がいい**（景氣好）、**景気が悪い**（景氣差）。"
+    },
+    {
+      "id": "n3-biz-003",
+      "japanese": "製品",
+      "hiragana": "せいひん",
+      "simple_chinese": "產品"
+    },
+    {
+      "id": "n3-biz-004",
+      "japanese": "輸出",
+      "hiragana": "ゆしゅつ",
+      "simple_chinese": "出口",
+      "full_explanation": "反義詞：**輸入**（ゆにゅう）進口"
+    },
+    {
+      "id": "n3-biz-005",
+      "japanese": "支払う",
+      "hiragana": "しはらう",
+      "simple_chinese": "支付"
+    },
+    {
+      "id": "n3-biz-006",
+      "japanese": "締め切り",
+      "hiragana": "しめきり",
+      "simple_chinese": "截止期限",
+      "full_explanation": "例：締め切りに間に合う（趕上截止期限）"
+    },
+    {
+      "id": "n3-biz-007",
+      "japanese": "確認",
+      "hiragana": "かくにん",
+      "simple_chinese": "確認"
+    },
+    {
+      "id": "n3-biz-008",
+      "japanese": "コスト",
+      "simple_chinese": "成本",
+      "full_explanation": "源自英文 *cost*。例：コストを削減する（削減成本）"
+    }
+  ]
+}

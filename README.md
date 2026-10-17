@@ -11,7 +11,8 @@ npm install      # 安裝套件
 npm run dev      # 啟動開發伺服器
 npm test         # 執行單元測試
 npm run lint     # ESLint 檢查並自動修正
-npm run build    # 型別檢查＋建置到 dist/
+npm run validate-data  # 檢查 data/ 下所有資料集格式
+npm run build    # 驗證資料＋型別檢查＋建置到 dist/
 ```
 
 ## 資料集
@@ -24,7 +25,8 @@ data/
 └─ grammar/      # 文法
 ```
 
-格式說明見 [plan.md 第 4 節](plan.md#4-資料格式)。
+格式說明見 [plan.md 第 4 節](plan.md#4-資料格式)。新增檔案後執行 `npm run validate-data` 檢查格式；
+格式錯誤時建置（以及 GitHub Actions 部署）會失敗。
 
 ## 部署
 

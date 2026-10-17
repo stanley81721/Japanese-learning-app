@@ -1,0 +1,44 @@
+{
+  "name": "N4 日常單字（範例）",
+  "category": "vocabulary",
+  "level": "N4",
+  "data": [
+    {
+      "id": "n4-daily-001",
+      "japanese": "準備",
+      "hiragana": "じゅんび",
+      "simple_chinese": "準備"
+    },
+    {
+      "id": "n4-daily-002",
+      "japanese": "経験",
+      "hiragana": "けいけん",
+      "simple_chinese": "經驗"
+    },
+    {
+      "id": "n4-daily-003",
+      "japanese": "招待",
+      "hiragana": "しょうたい",
+      "simple_chinese": "邀請",
+      "full_explanation": "例：友達を誕生日パーティーに招待する（邀請朋友參加生日派對）"
+    },
+    {
+      "id": "n4-daily-004",
+      "japanese": "引っ越す",
+      "hiragana": "ひっこす",
+      "simple_chinese": "搬家"
+    },
+    {
+      "id": "n4-daily-005",
+      "japanese": "必ず",
+      "hiragana": "かならず",
+      "simple_chinese": "一定、必定"
+    },
+    {
+      "id": "n4-daily-006",
+      "japanese": "ゆっくり",
+      "simple_chinese": "慢慢地；悠閒地",
+      "full_explanation": "例：ゆっくり話してください（請說慢一點）"
+    }
+  ]
+}

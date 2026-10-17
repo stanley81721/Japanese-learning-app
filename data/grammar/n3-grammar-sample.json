@@ -1,0 +1,77 @@
+{
+  "name": "N3 文法（範例）",
+  "category": "grammar",
+  "level": "N3",
+  "data": [
+    {
+      "id": "n3-gram-001",
+      "japanese": "うちに",
+      "simple_chinese": "趁～；在～的過程中",
+      "full_explanation": "**接續**：動詞辞書形／ている形／ない形、い形容詞、な形容詞＋な、名詞＋の ＋ うちに\n\n1. 趁某狀態還沒改變時做某事\n2. 在某狀態持續的期間，不知不覺發生了變化",
+      "examples": [
+        {
+          "sentence": "若い【うちに】いろいろな経験をしたほうがいい。",
+          "translation": "趁年輕時最好多累積各種經驗。"
+        },
+        {
+          "sentence": "話している【うちに】、彼のことが好きになった。",
+          "translation": "聊著聊著，就喜歡上他了。"
+        }
+      ]
+    },
+    {
+      "id": "n3-gram-002",
+      "japanese": "たばかり",
+      "simple_chinese": "剛剛～",
+      "full_explanation": "**接續**：動詞た形＋ばかり\n\n表示動作剛結束不久（說話者主觀感覺時間很短）。",
+      "examples": [
+        {
+          "sentence": "日本に来【たばかり】なので、まだ日本語が下手です。",
+          "translation": "因為剛來日本，日文還不好。"
+        }
+      ]
+    },
+    {
+      "id": "n3-gram-003",
+      "japanese": "ようにする",
+      "simple_chinese": "盡量～；設法做到～",
+      "full_explanation": "**接續**：動詞辞書形／ない形＋ようにする\n\n表示為了養成習慣或達成目標而努力。",
+      "examples": [
+        {
+          "sentence": "毎日野菜を食べる【ようにしています】。",
+          "translation": "我盡量每天吃蔬菜。"
+        }
+      ]
+    },
+    {
+      "id": "n3-gram-004",
+      "japanese": "ことにする",
+      "simple_chinese": "決定～",
+      "full_explanation": "**接續**：動詞辞書形／ない形＋ことにする\n\n表示說話者自己做的決定。",
+      "examples": [
+        {
+          "sentence": "来年、留学する【ことにしました】。",
+          "translation": "我決定明年去留學。"
+        }
+      ]
+    },
+    {
+      "id": "n3-gram-005",
+      "japanese": "わけではない",
+      "simple_chinese": "並不是～",
+      "full_explanation": "部分否定，用來修正對方可能的誤解。",
+      "examples": [
+        {
+          "sentence": "肉が嫌いな【わけではない】が、あまり食べない。",
+          "translation": "並不是討厭吃肉，只是不常吃。"
+        }
+      ]
+    },
+    {
+      "id": "n3-gram-006",
+      "japanese": "さえ～ば",
+      "simple_chinese": "只要～就～",
+      "full_explanation": "**接續**：名詞＋さえ＋動詞ば形\n\n表示只要滿足這個條件就足夠。"
+    }
+  ]
+}

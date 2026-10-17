@@ -1,20 +1,47 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 
 import FlashCard from '@/components/FlashCard.vue'
+import GradeButtons from '@/components/GradeButtons.vue'
 import { buildPracticeDeck } from '@/lib/deck'
+import { buildStudyQueue, countDataset } from '@/lib/queue'
 import { QUIZ_MODES, getQuizMode } from '@/lib/quizModes'
+import type { Grade } from '@/lib/srs'
 import { useDatasetsStore } from '@/stores/datasets'
+import { useProgressStore } from '@/stores/progress'
+import { useSettingsStore } from '@/stores/settings'
 import { useStudySessionStore } from '@/stores/studySession'
 import { CATEGORY_LABELS, type Category } from '@/types/dataset'
 
 const datasetsStore = useDatasetsStore()
+const progress = useProgressStore()
+const settings = useSettingsStore()
 const session = useStudySessionStore()
 const { status: loadStatus, selectedDatasets, selectedItemCount } = storeToRefs(datasetsStore)
-const { status, current, flipped, index, cards, enabledModes, knownCount, unknownCards } =
-  storeToRefs(session)
+const { newCardsPerDay } = storeToRefs(settings)
+const {
+  mode,
+  status,
+  current,
+  flipped,
+  index,
+  queue,
+  remaining,
+  enabledModes,
+  studiedCount,
+  reviewCount,
+  knownCount,
+  unknownCards,
+  intervalPreview,
+} = storeToRefs(session)
+
+// 回到設定畫面時更新時間，讓到期數保持正確
+const now = ref(Date.now())
+watch(status, (s) => {
+  if (s === 'setup') now.value = Date.now()
+})
 
 /** 已選資料集涉及的分類，以及各分類可選的測驗方向 */
 const modeGroups = computed(() => {
@@ -26,18 +53,60 @@ const modeGroups = computed(() => {
   }))
 })
 
-const previewDeckSize = computed(() =>
+const newToday = computed(() => progress.statsFor(now.value).newCards)
+const newRemaining = computed(() => Math.max(0, newCardsPerDay.value - newToday.value))
+
+const dueCount = computed(() =>
+  selectedDatasets.value.reduce(
+    (sum, d) => sum + countDataset(d, enabledModes.value, progress.get, now.value).due,
+    0,
+  ),
+)
+
+function buildQueue() {
+  return buildStudyQueue({
+    datasets: selectedDatasets.value,
+    modeIds: enabledModes.value,
+    progress: progress.get,
+    newLimit: newRemaining.value,
+    now: now.value,
+  })
+}
+
+// 只用來顯示張數；實際開始時會重新洗牌
+const queuePreviewSize = computed(() => buildQueue().length)
+const newInQueue = computed(() => queuePreviewSize.value - dueCount.value)
+
+const practiceDeckSize = computed(() =>
   selectedDatasets.value
     .filter((d) => enabledModes.value.some((id) => getQuizMode(id).category === d.category))
     .reduce((sum, d) => sum + d.data.length, 0),
 )
 
 const progressPercent = computed(() =>
-  cards.value.length ? Math.round((index.value / cards.value.length) * 100) : 0,
+  queue.value.length ? Math.round((index.value / queue.value.length) * 100) : 0,
 )
 
+function startStudy() {
+  now.value = Date.now()
+  session.start(buildQueue(), 'srs')
+}
+
 function startPractice() {
-  session.start(buildPracticeDeck(selectedDatasets.value, enabledModes.value))
+  session.start(buildPracticeDeck(selectedDatasets.value, enabledModes.value), 'practice')
+}
+
+function onNewLimitInput(event: Event) {
+  const value = Number((event.target as HTMLInputElement).value)
+  if (Number.isInteger(value) && value >= 0 && value <= 999) newCardsPerDay.value = value
+}
+
+const SRS_KEYS: Record<string, Grade> = { '1': 'again', '2': 'hard', '3': 'good', '4': 'easy' }
+const PRACTICE_KEYS: Record<string, Grade> = {
+  '1': 'again',
+  ArrowLeft: 'again',
+  '2': 'good',
+  ArrowRight: 'good',
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -51,11 +120,11 @@ function onKeydown(event: KeyboardEvent) {
     if (target?.closest('button')) return
     event.preventDefault()
     session.flip()
-  } else if (flipped.value && (event.key === '1' || event.key === 'ArrowLeft')) {
-    session.answer(false)
-  } else if (flipped.value && (event.key === '2' || event.key === 'ArrowRight')) {
-    session.answer(true)
+    return
   }
+
+  const grade = (mode.value === 'srs' ? SRS_KEYS : PRACTICE_KEYS)[event.key]
+  if (flipped.value && grade) session.answer(grade)
 }
 
 onMounted(() => {
@@ -68,6 +137,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 <template>
   <section class="study">
+    <div v-if="progress.readOnly" class="warning" role="alert">
+      無法讀取瀏覽器中已存的學習進度（格式不符）。為避免覆蓋，這次的進度不會被儲存。
+    </div>
+    <div v-else-if="progress.saveFailed" class="warning" role="alert">
+      學習進度儲存失敗，可能是瀏覽器儲存空間已滿或被封鎖。
+    </div>
+
     <!-- 設定 -->
     <template v-if="status === 'setup'">
       <h1>學習</h1>
@@ -91,87 +167,135 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <div class="panel">
           <h2>測驗方向</h2>
-          <p class="muted small">可複選；每張卡會從勾選的方向中隨機挑一個。</p>
+          <p class="muted small">可複選；每個方向的記憶進度分開計算。</p>
           <fieldset v-for="group in modeGroups" :key="group.category" class="mode-group">
             <legend>{{ group.label }}</legend>
-            <label v-for="mode in group.modes" :key="mode.id" class="mode-option">
+            <label v-for="m in group.modes" :key="m.id" class="mode-option">
               <input
                 type="checkbox"
-                :checked="enabledModes.includes(mode.id)"
-                @change="session.toggleMode(mode.id)"
+                :checked="enabledModes.includes(m.id)"
+                @change="session.toggleMode(m.id)"
               />
-              {{ mode.label }}
+              {{ m.label }}
             </label>
           </fieldset>
         </div>
 
+        <div class="panel">
+          <h2>今天</h2>
+          <div class="today">
+            <div>
+              <div class="stat-num due">{{ dueCount }}</div>
+              <div class="muted small">到期複習</div>
+            </div>
+            <div>
+              <div class="stat-num new">{{ newInQueue }}</div>
+              <div class="muted small">新卡</div>
+            </div>
+          </div>
+          <label class="new-limit">
+            每日新卡上限
+            <input
+              type="number"
+              min="0"
+              max="999"
+              :value="newCardsPerDay"
+              @change="onNewLimitInput"
+            />
+            <span class="muted small">（今天已學 {{ newToday }} 張）</span>
+          </label>
+        </div>
+
+        <p v-if="queuePreviewSize === 0" class="done-message">
+          今天的卡片都完成了！可以明天再來，或用自由練習多複習幾次。
+        </p>
+
         <div class="start-row">
-          <span class="muted">本次 {{ previewDeckSize }} 張卡</span>
+          <button
+            type="button"
+            class="btn"
+            :disabled="practiceDeckSize === 0"
+            title="洗牌練習全部卡片，不影響記憶進度"
+            @click="startPractice"
+          >
+            自由練習（{{ practiceDeckSize }}）
+          </button>
           <button
             type="button"
             class="btn btn-primary"
-            :disabled="previewDeckSize === 0"
-            @click="startPractice"
+            :disabled="queuePreviewSize === 0"
+            @click="startStudy"
           >
-            開始練習
+            開始學習（{{ queuePreviewSize }}）
           </button>
         </div>
-        <p class="muted small">目前為自由練習（洗牌、不記錄進度）。記憶演算法將在 M3 加入。</p>
       </template>
     </template>
 
-    <!-- 練習中 -->
+    <!-- 學習中 -->
     <template v-else-if="status === 'active' && current">
       <div class="session-header">
         <span class="muted small">
-          {{ current.datasetName }}・{{ getQuizMode(current.modeId).label }}
+          {{ mode === 'srs' ? '記憶複習' : '自由練習' }}・{{ current.datasetName }}・{{
+            getQuizMode(current.modeId).label
+          }}
         </span>
-        <span class="counter">{{ index + 1 }} / {{ cards.length }}</span>
+        <span class="counter">剩 {{ remaining }} 張</span>
       </div>
       <div
         class="progress"
         role="progressbar"
         :aria-valuenow="index"
         aria-valuemin="0"
-        :aria-valuemax="cards.length"
+        :aria-valuemax="queue.length"
       >
         <div class="progress-bar" :style="{ width: `${progressPercent}%` }" />
       </div>
 
-      <FlashCard :key="current.key" :card="current" :flipped="flipped" @flip="session.flip()" />
+      <FlashCard
+        :key="`${current.key}#${index}`"
+        :card="current"
+        :flipped="flipped"
+        @flip="session.flip()"
+      />
 
       <div class="answer-row">
         <button v-if="!flipped" type="button" class="btn btn-primary wide" @click="session.flip()">
           翻面 <kbd>Space</kbd>
         </button>
-        <template v-else>
-          <button type="button" class="btn btn-danger wide" @click="session.answer(false)">
-            不會 <kbd>1</kbd>
-          </button>
-          <button type="button" class="btn btn-success wide" @click="session.answer(true)">
-            會了 <kbd>2</kbd>
-          </button>
-        </template>
+        <GradeButtons
+          v-else
+          class="wide"
+          :intervals="intervalPreview"
+          @grade="session.answer"
+        />
       </div>
 
       <div class="end-row">
-        <button type="button" class="small-link" @click="session.reset()">結束練習</button>
+        <button type="button" class="small-link" @click="session.reset()">結束</button>
       </div>
     </template>
 
     <!-- 結果 -->
     <template v-else-if="status === 'finished'">
-      <h1>練習完成</h1>
+      <h1>{{ mode === 'srs' ? '今天的學習完成了' : '練習完成' }}</h1>
       <div class="panel summary">
         <div>
-          <div class="stat success">{{ knownCount }}</div>
-          <div class="muted">會了</div>
+          <div class="stat-num">{{ studiedCount }}</div>
+          <div class="muted small">張卡</div>
         </div>
         <div>
-          <div class="stat danger">{{ unknownCards.length }}</div>
-          <div class="muted">不會</div>
+          <div class="stat-num good">{{ knownCount }}</div>
+          <div class="muted small">第一次就記得</div>
+        </div>
+        <div>
+          <div class="stat-num again">{{ unknownCards.length }}</div>
+          <div class="muted small">忘記</div>
         </div>
       </div>
+      <p v-if="mode === 'srs'" class="muted small center">
+        共評分 {{ reviewCount }} 次，進度已儲存在這個瀏覽器中。
+      </p>
       <div class="start-row">
         <button type="button" class="btn" @click="session.reset()">回到設定</button>
         <button
@@ -180,10 +304,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           class="btn btn-primary"
           @click="session.retryUnknown()"
         >
-          再練一次不會的（{{ unknownCards.length }}）
-        </button>
-        <button v-else type="button" class="btn btn-primary" @click="startPractice">
-          再練一輪
+          再練一次忘記的（{{ unknownCards.length }}）
         </button>
       </div>
     </template>
@@ -210,6 +331,19 @@ h2 {
 }
 
 .small {
+  font-size: 0.875rem;
+}
+
+.center {
+  text-align: center;
+}
+
+.warning {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  background: var(--color-danger-soft);
   font-size: 0.875rem;
 }
 
@@ -263,6 +397,38 @@ h2 {
   accent-color: var(--color-primary);
 }
 
+.today {
+  display: flex;
+  gap: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.new-limit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.new-limit input {
+  width: 4.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.done-message {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  text-align: center;
+}
+
 .start-row {
   display: flex;
   flex-wrap: wrap;
@@ -280,6 +446,7 @@ h2 {
 }
 
 .counter {
+  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
@@ -319,16 +486,25 @@ h2 {
   text-align: center;
 }
 
-.stat {
-  font-size: 2.5rem;
+.stat-num {
+  font-size: 2rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
-.stat.success {
+.stat-num.due {
+  color: var(--color-primary);
+}
+
+.stat-num.new {
+  color: var(--color-vocab);
+}
+
+.stat-num.good {
   color: var(--color-success);
 }
 
-.stat.danger {
+.stat-num.again {
   color: var(--color-danger);
 }
 </style>

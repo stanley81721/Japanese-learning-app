@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { storeToRefs } from 'pinia'
 
 import FilterChips from '@/components/FilterChips.vue'
+import { countDataset, type DatasetCounts } from '@/lib/queue'
 import { useDatasetsStore, type CategoryFilter, type LevelFilter } from '@/stores/datasets'
-import { CATEGORIES, CATEGORY_LABELS, LEVELS } from '@/types/dataset'
+import { useProgressStore } from '@/stores/progress'
+import { useStudySessionStore } from '@/stores/studySession'
+import { CATEGORIES, CATEGORY_LABELS, LEVELS, type Dataset } from '@/types/dataset'
 
 const store = useDatasetsStore()
+const progress = useProgressStore()
+const session = useStudySessionStore()
+const now = Date.now()
 const {
   status,
   loadErrors,
@@ -27,6 +33,16 @@ const levelOptions: { value: LevelFilter; label: string }[] = [
   { value: 'all', label: '全部' },
   ...LEVELS.map((l) => ({ value: l, label: l })),
 ]
+
+/** 每份資料集依目前勾選的測驗方向計算的到期／已學／未學數 */
+const countsById = computed<Record<string, DatasetCounts>>(() =>
+  Object.fromEntries(
+    filteredDatasets.value.map((d: Dataset) => [
+      d.id,
+      countDataset(d, session.enabledModes, progress.get, now),
+    ]),
+  ),
+)
 
 onMounted(() => store.ensureLoaded())
 </script>
@@ -82,6 +98,13 @@ onMounted(() => store.ensureLoaded())
               </span>
               <span class="badge level">{{ dataset.level }}</span>
               <span class="muted">{{ dataset.data.length }} 筆</span>
+            </span>
+            <span v-if="countsById[dataset.id]" class="dataset-progress">
+              <span :class="{ due: countsById[dataset.id]!.due > 0 }">
+                到期 {{ countsById[dataset.id]!.due }}
+              </span>
+              <span>已學 {{ countsById[dataset.id]!.seen }}</span>
+              <span>未學 {{ countsById[dataset.id]!.unseen }}</span>
             </span>
           </label>
         </li>
@@ -206,6 +229,19 @@ h1 {
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8125rem;
+}
+
+.dataset-progress {
+  grid-column: 2;
+  display: flex;
+  gap: 0.75rem;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.dataset-progress .due {
+  color: var(--color-primary);
+  font-weight: 600;
 }
 
 .badge {
